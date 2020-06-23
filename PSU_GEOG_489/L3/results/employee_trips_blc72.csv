@@ -1,0 +1,15 @@
+,Name,ID,Duration,Start,End,Route
+0,"Brown, Justine",2132225,5,2016-11-30 16:00:00,2016-12-06 14:00:00,Pittsburgh;Syracuse
+1,"Brown, Justine",2132225,9,2016-12-12 12:00:00,2016-12-21 19:00:00,Columbus;Boston;Pittsburgh
+2,"Brown, Justine",2132225,12,2016-08-02 13:00:00,2016-08-14 16:00:00,Albany;Scranton;Philadelphia;Scranton;Augusta
+3,"Brown, Justine",2132225,12,2017-01-07 11:00:00,2017-01-19 17:00:00,Harrisburg;Portland;Boston;Syracuse;Albany
+4,"Brown, Justine",2132225,17,2017-03-27 06:00:00,2017-04-13 14:00:00,Portland;Boston;Bangor;Washington;Harrisburg;Pittsburgh
+5,"Brown, Justine",2132225,19,2016-11-04 17:00:00,2016-11-23 20:00:00,New York;Portland;Boston;Portland;Washington;Pittsburgh;Syracuse;Scranton;Boston
+6,"Jones, Frank",2132222,5,2016-07-10 18:00:00,2016-07-15 18:00:00,Harrisburg;Augusta
+7,"Jones, Frank",2132222,10,2017-01-18 12:00:00,2017-01-28 19:00:00,Philadelphia;Boston;Altoona;Harrisburg;Scranton
+8,"Jones, Frank",2132222,17,2017-03-16 17:00:00,2017-04-02 18:00:00,Augusta;New York;Scranton;Columbus;Washington;Augusta;Bangor
+9,"Samulson, Roger",3981232,7,2016-10-15 07:00:00,2016-10-22 17:00:00,Boston;Syracuse;Portland;Altoona
+10,"Samulson, Roger",3981232,7,2017-02-10 07:00:00,2017-02-17 19:00:00,Portland;Augusta;Burlington;Philadelphia
+11,"Samulson, Roger",3981232,9,2016-07-24 17:00:00,2016-08-03 12:00:00,Erie;Syracuse;Philadelphia;Bangor;Scranton
+12,"Samulson, Roger",3981232,15,2017-02-24 06:00:00,2017-03-11 20:00:00,New York;Augusta;Pittsburgh;Cleveland;Altoona
+13,"Samulson, Roger",3981232,18,2016-12-25 17:00:00,2017-01-12 17:00:00,Boston;Cleveland;Pittsburgh;Philadelphia;Harrisburg;Albany;Portland;Harrisburg
