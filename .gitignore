@@ -1,4 +1,4 @@
 .env
 .DS_Store
 examples/
-/.ipynb_checkpoints/
+.ipynb_checkpoints/
