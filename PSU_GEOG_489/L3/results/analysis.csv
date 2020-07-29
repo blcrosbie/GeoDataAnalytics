@@ -1,0 +1,4 @@
+,Name,total_trips,total_travel_days,total_cities,cities_visited,total_time_span,longest_trip_days,shortest_trip_days,most_stops_in_single_trip,total_distance_mi,avg_distance_per_travel_day (total_distance/total_travel_days),avg_days_per_trip (total_travel_days/total_trips),travel_time_PCT (total_travel_days/total_time_span),trip count ratio (one trip):(total_time_span/total_trips)
+0,"Jones, Frank",3,32,10,Harrisburg;Augusta;Philadelphia;Boston;Altoona;Scranton;New York;Columbus;Washington;Bangor,266,17,5,5,4526.2,141.4,10.7,12.0,88.7
+1,"Brown, Justine",6,74,13,Pittsburgh;Syracuse;Columbus;Boston;Albany;Scranton;Philadelphia;Augusta;Harrisburg;Portland;Bangor;Washington;New York,254,19,5,6,9215.3,124.5,12.3,29.1,42.3
+2,"Samulson, Roger",5,56,15,Boston;Syracuse;Portland;Altoona;Augusta;Burlington;Philadelphia;Erie;Bangor;Scranton;New York;Pittsburgh;Cleveland;Harrisburg;Albany,230,18,7,4,9405.2,168.0,11.2,24.3,46.0
