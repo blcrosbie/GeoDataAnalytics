@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>geemapDockWidgetBase</class>
+ <widget class="QDockWidget" name="geemapDockWidgetBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>334</width>
+    <height>731</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Google Earth Engine Dataset Search</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="0">
+     <widget class="QGroupBox" name="MainBox">
+      <property name="title">
+       <string>Search</string>
+      </property>
+      <widget class="QWidget" name="horizontalLayoutWidget">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>160</y>
+         <width>301</width>
+         <height>91</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="filterTimeHL">
+        <item>
+         <widget class="QGroupBox" name="filterTimeGRP">
+          <property name="title">
+           <string>Time</string>
+          </property>
+          <widget class="QDateEdit" name="filterTimeStartDE">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>30</y>
+             <width>81</width>
+             <height>22</height>
+            </rect>
+           </property>
+           <property name="date">
+            <date>
+             <year>1980</year>
+             <month>1</month>
+             <day>1</day>
+            </date>
+           </property>
+          </widget>
+          <widget class="QDateEdit" name="filterTimeEndDE">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>60</y>
+             <width>81</width>
+             <height>22</height>
+            </rect>
+           </property>
+           <property name="date">
+            <date>
+             <year>2020</year>
+             <month>7</month>
+             <day>1</day>
+            </date>
+           </property>
+          </widget>
+          <widget class="QLabel" name="filterTimeStartLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>30</y>
+             <width>31</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Start:</string>
+           </property>
+          </widget>
+          <widget class="QLabel" name="filterTimeEndLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>60</y>
+             <width>31</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>End:</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="filterTimeMinBTN">
+           <property name="geometry">
+            <rect>
+             <x>40</x>
+             <y>30</y>
+             <width>31</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>BOT</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="filterTimeMaxBTN">
+           <property name="geometry">
+            <rect>
+             <x>40</x>
+             <y>60</y>
+             <width>31</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>EOT</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTimeYtdRB">
+           <property name="geometry">
+            <rect>
+             <x>180</x>
+             <y>40</y>
+             <width>41</width>
+             <height>18</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>YTD</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTimeYr1RB">
+           <property name="geometry">
+            <rect>
+             <x>180</x>
+             <y>60</y>
+             <width>61</width>
+             <height>18</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>1 YR</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTimeMn1RB">
+           <property name="geometry">
+            <rect>
+             <x>240</x>
+             <y>60</y>
+             <width>41</width>
+             <height>20</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>1 M</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTimeMn3RB">
+           <property name="geometry">
+            <rect>
+             <x>240</x>
+             <y>40</y>
+             <width>41</width>
+             <height>20</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>3 M</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTimeMn6RB">
+           <property name="geometry">
+            <rect>
+             <x>240</x>
+             <y>20</y>
+             <width>41</width>
+             <height>20</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>6 M</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTimeCustomRB">
+           <property name="geometry">
+            <rect>
+             <x>180</x>
+             <y>20</y>
+             <width>61</width>
+             <height>18</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Custom</string>
+           </property>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_3">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>530</y>
+         <width>301</width>
+         <height>51</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="locationSearchHL">
+        <item>
+         <widget class="QGroupBox" name="locationSearchGRP">
+          <property name="title">
+           <string>Location</string>
+          </property>
+          <widget class="QLineEdit" name="locationSearchLatitudeLE">
+           <property name="geometry">
+            <rect>
+             <x>40</x>
+             <y>20</y>
+             <width>71</width>
+             <height>20</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QLabel" name="locationSearchLatLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>20</y>
+             <width>21</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Lat:</string>
+           </property>
+          </widget>
+          <widget class="QLabel" name="locationSearchLonLabel">
+           <property name="geometry">
+            <rect>
+             <x>120</x>
+             <y>20</y>
+             <width>21</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Lon:</string>
+           </property>
+          </widget>
+          <widget class="QLineEdit" name="locationSearchLongitudeLE">
+           <property name="geometry">
+            <rect>
+             <x>150</x>
+             <y>20</y>
+             <width>71</width>
+             <height>20</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="locationSearchBTN">
+           <property name="geometry">
+            <rect>
+             <x>230</x>
+             <y>20</y>
+             <width>61</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Find Me!</string>
+           </property>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_4">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>40</y>
+         <width>301</width>
+         <height>121</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="filterAttributesHL">
+        <item>
+         <widget class="QGroupBox" name="filterAttributesGRP">
+          <property name="title">
+           <string>Attributes</string>
+          </property>
+          <widget class="QLineEdit" name="filterTagSelectLE">
+           <property name="geometry">
+            <rect>
+             <x>120</x>
+             <y>40</y>
+             <width>81</width>
+             <height>21</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTagOrRB">
+           <property name="geometry">
+            <rect>
+             <x>120</x>
+             <y>70</y>
+             <width>41</width>
+             <height>18</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>OR</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="filterTagAndRB">
+           <property name="geometry">
+            <rect>
+             <x>160</x>
+             <y>70</y>
+             <width>41</width>
+             <height>18</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>AND</string>
+           </property>
+          </widget>
+          <widget class="QListView" name="filterTagSelectLV">
+           <property name="geometry">
+            <rect>
+             <x>210</x>
+             <y>30</y>
+             <width>81</width>
+             <height>81</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="filterTagClearBTN">
+           <property name="geometry">
+            <rect>
+             <x>120</x>
+             <y>90</y>
+             <width>81</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Clear Tags</string>
+           </property>
+          </widget>
+          <widget class="QLabel" name="filterDatasetTypeLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>20</y>
+             <width>81</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Dataset Type:</string>
+           </property>
+          </widget>
+          <widget class="QComboBox" name="filterDatasetTypeCB">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>40</y>
+             <width>101</width>
+             <height>20</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QLabel" name="filterDatasetPublisherLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>70</y>
+             <width>81</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Publisher:</string>
+           </property>
+          </widget>
+          <widget class="QComboBox" name="filterDatasetPublisherCB">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>90</y>
+             <width>101</width>
+             <height>20</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QLabel" name="filterTagLabel">
+           <property name="geometry">
+            <rect>
+             <x>120</x>
+             <y>20</y>
+             <width>31</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Tags:</string>
+           </property>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_5">
+       <property name="geometry">
+        <rect>
+         <x>9</x>
+         <y>590</y>
+         <width>301</width>
+         <height>91</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="locationFilterHL">
+        <item>
+         <widget class="QGroupBox" name="locationFilterGRP">
+          <property name="title">
+           <string>GeoFilter</string>
+          </property>
+          <widget class="QLabel" name="locationFilterRadiusLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>20</y>
+             <width>51</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Distance:</string>
+           </property>
+          </widget>
+          <widget class="QLineEdit" name="locationFilterRadiusLE">
+           <property name="geometry">
+            <rect>
+             <x>60</x>
+             <y>20</y>
+             <width>51</width>
+             <height>20</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="locationFilterUnitKmRB">
+           <property name="geometry">
+            <rect>
+             <x>40</x>
+             <y>40</y>
+             <width>41</width>
+             <height>20</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>km</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="locationFilterApplyBTN">
+           <property name="geometry">
+            <rect>
+             <x>200</x>
+             <y>20</y>
+             <width>91</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Apply</string>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="locationFilterImportTB">
+           <property name="geometry">
+            <rect>
+             <x>260</x>
+             <y>60</y>
+             <width>31</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>...</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="locationFilterDrawLastBTN">
+           <property name="geometry">
+            <rect>
+             <x>40</x>
+             <y>60</y>
+             <width>31</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Last</string>
+           </property>
+          </widget>
+          <widget class="QLineEdit" name="locationFilterImportLE">
+           <property name="geometry">
+            <rect>
+             <x>190</x>
+             <y>60</y>
+             <width>61</width>
+             <height>21</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QLabel" name="locationFilterDrawLabel">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>60</y>
+             <width>31</width>
+             <height>16</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Draw:</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="locationFilterDrawAllBTN">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>60</y>
+             <width>31</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>All</string>
+           </property>
+          </widget>
+          <widget class="QRadioButton" name="locationFilterUnitMiRB">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>40</y>
+             <width>41</width>
+             <height>20</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>mi</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="locationFilterImportBTN">
+           <property name="geometry">
+            <rect>
+             <x>130</x>
+             <y>60</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Import</string>
+           </property>
+          </widget>
+          <widget class="QComboBox" name="locationFilterGeometryCB">
+           <property name="geometry">
+            <rect>
+             <x>120</x>
+             <y>20</y>
+             <width>71</width>
+             <height>22</height>
+            </rect>
+           </property>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_6">
+       <property name="geometry">
+        <rect>
+         <x>9</x>
+         <y>280</y>
+         <width>301</width>
+         <height>201</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="resultsSelectHL">
+        <item>
+         <widget class="QGroupBox" name="resultsSelectGRP">
+          <property name="title">
+           <string>Results</string>
+          </property>
+          <widget class="QListView" name="resultsSelectLV">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>20</y>
+             <width>201</width>
+             <height>171</height>
+            </rect>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="resultsSelectSelectAllBTN">
+           <property name="geometry">
+            <rect>
+             <x>220</x>
+             <y>20</y>
+             <width>75</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Select All</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="resultsSelectInvertBTN">
+           <property name="geometry">
+            <rect>
+             <x>220</x>
+             <y>50</y>
+             <width>75</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Invert</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="resultsSelectClearAllBTN">
+           <property name="geometry">
+            <rect>
+             <x>220</x>
+             <y>80</y>
+             <width>75</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Clear All</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="resultsSelectCalculateRequestsBTN">
+           <property name="geometry">
+            <rect>
+             <x>220</x>
+             <y>170</y>
+             <width>75</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Calculate</string>
+           </property>
+          </widget>
+          <widget class="QLCDNumber" name="lcdNumber">
+           <property name="geometry">
+            <rect>
+             <x>220</x>
+             <y>140</y>
+             <width>71</width>
+             <height>23</height>
+            </rect>
+           </property>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_7">
+       <property name="geometry">
+        <rect>
+         <x>9</x>
+         <y>490</y>
+         <width>301</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="automationHL">
+        <item>
+         <widget class="QPushButton" name="automationSubmitRequestBTN">
+          <property name="text">
+           <string>Submit Request</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="automationCreateScriptBTN">
+          <property name="text">
+           <string>Create Script</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_8">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>20</y>
+         <width>291</width>
+         <height>25</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="formBeginHL">
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="formBeginStartBTN">
+          <property name="text">
+           <string>Start</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="formBeginResetBTN">
+          <property name="text">
+           <string>Reset</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget_9">
+       <property name="geometry">
+        <rect>
+         <x>9</x>
+         <y>250</y>
+         <width>301</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <layout class="QHBoxLayout" name="searchAllHL">
+        <item>
+         <widget class="QPushButton" name="searchAllBTN">
+          <property name="text">
+           <string>Search</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
