@@ -61,6 +61,7 @@ from PyQt5.QtCore import QDate
 # EXTRA REQUIREMENTS
 # Requires Pip/Conda Installation for QGIS
 from bs4 import BeautifulSoup
+import ee
 
 
 # # Declare save form class briefly
@@ -187,7 +188,7 @@ class geemapDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.resultsSelectClearAllBTN.clicked.connect(self.clearAll)
         self.resultsSelectSelectAllBTN.clicked.connect(self.selectAll)
         self.resultsSelectInvertBTN.clicked.connect(self.invertAll)
-        self.resultsSelectCalculateRequestsBTN.clicked.connect(self.GetMoreInfo)
+        self.resultsSelectCalculateRequestsBTN.clicked.connect(self.estimate_requests)
 
         # ===== Location Group =====
         # Initialize the Lat/Lon format Line Edit
@@ -1215,64 +1216,27 @@ class geemapDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
 
 
-    def GetMoreInfo(self):
+    def estimate_requests(self):
         """ This will be used to query the getInfo() ee Method"""
+        print("HERE")
+        from .scripts import ee_catalog_details
+
 
         self.read_results()
+        print(self.results)
         try:
-            assert len(self.results) <= 1, "Please Limit Selection to 1"
-            
-            # Actual Earth Engine Python API
-            import ee
 
             # 1. make a list of the ID's in the results
             # 2. Call the ee.ImageCollection("<dataset_id>").getInfo()
             dataset_id_list = []
             start = self.filterTimeStartDE.text()
             end = self.filterTimeEndDE.text()
-            print(start)
-            print(end)
 
             for dataset in self.results:
-
-                dataset_id = dataset['dataset_id']
-                dataset_type = dataset['dataset_type']
-
-                if dataset_type == 'ImageCollection':
-                    IC = ee.ImageCollection(dataset_id).filterDate(start, end)
-                    info = IC.getInfo()
-                    print(len(info))
-                    for item in info:
-                        print(item)
+                calculations = ee_catalog_details.calculate_requests(dataset)
+                print(calculations)
 
 
-                elif dataset_type == 'Image':
-                    print("COMING SOON!")
-                    # image = ee.Image(dataset_id)
-                    # info = image.getInfo()
-                    # print(info)
-
-                    # # Need to scan properties for vis parameters
-                    # properties = info['properties']
-                    # print(properties)
-
-                    # # need to know bands in Image
-                    # bands = info['bands']
-                    # print(bands)
-
-                    # # Check for CRS transform
-    
- 
-
-
-
-                elif dataset_type == 'FeatureCollection':
-                    print("COMING SOON!")
-
-
-
-                else:
-                    print("COMING SOON!")
 
         except Exception as e:
             print("DEVELOPING REQUEST CALCULATOR IN PROGRESS")
