@@ -5,6 +5,10 @@ import datetime
 import requests
 from bs4 import BeautifulSoup
 
+
+from common import save_progressive_json
+
+
 def get_td_name(td):
     a_tag = td.findAll('a')
     for a in a_tag:
@@ -198,27 +202,6 @@ def follow_dataset_link(tag_name, URL):
     return result
 
 
-def save_catalog(results, partial=False):
-    """Save this simple metadata to json """
-    PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    METADATA_DIR = os.path.join(PLUGIN_DIR, "metadata") 
-
-    # Base Filename
-    fn = 'gee_catalog'
-    ftype = '.json'
-    
-    # if we have partial results, track the last result index
-    if partial:
-        fn = fn + '_(' + str(len(results)-1) + ')'
-
-    # Add all
-    fn = fn + ftype
-    # now get full file path + name
-    filename = os.path.join(METADATA_DIR, fn)
-
-    with open(filename, 'w') as outfile:
-        json.dump(results, outfile)
-
 
 
 def get_catalog():
@@ -237,7 +220,9 @@ def get_catalog():
 
     # total GEE datasets: 409 as of 2020-07-21
     # print(len(all_tbodies))
-
+    PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    METADATA_DIR = os.path.join(PLUGIN_DIR, "metadata") 
+    filename = os.path.join(METADATA_DIR, 'gee_catalog')
     #=====================================
     # 1. Iterate through each tbody to extract metadata
     #=====================================
@@ -262,14 +247,14 @@ def get_catalog():
         except Exception as e:
             print(e)
             print("failed data extract on: ", tbody)
-            save_catalog(webscrape_results, partial=True)
+            save_progressive_json(fn=filename, results=webscrape_results, partial=True, total_len=len(all_tbodies))
             return
 
 
     #=====================================
     # 2. Save All metadata to json, all tests passed
     #=====================================
-    save_catalog(webscrape_results, partial=False)
+    save_progressive_json(fn=filename, results=webscrape_results)
 
 
 
@@ -291,7 +276,7 @@ def read_catalog():
 
 
 def test():
-    save_catalog({})
+    pass
 
 if __name__ == '__main__':
     read_catalog()

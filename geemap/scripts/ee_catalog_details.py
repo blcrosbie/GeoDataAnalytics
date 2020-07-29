@@ -18,6 +18,11 @@ import ee
 from setup_gee import ee_init
 ee_init()
 
+from ee_catalog import read_catalog
+
+# import all the common scripts as cs
+import common as cs
+
 
 
 def footprint2geometry(fp):
@@ -150,21 +155,9 @@ def get_info(dataset):
 
 ####################################################################
 
-def get_ee_catalog():
-    catalog_fn = os.path.join('metadata', 'gee_catalog.json')
-    fpath = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    fn = os.path.join(fpath, catalog_fn)
 
-    if os.path.exists(fn):
-        with open(fn, 'r') as in_file:
-            data = json.load(in_file)
-            return data
 
-    else:
-        print("No Catalog Found...\nnow running ee_catalog.py")
-        import ee_catalog
-        ee_catalog.get_catalog()
-        return get_ee_catalog()
+
 
 
 ####################################################################
@@ -172,7 +165,7 @@ def get_ee_catalog():
 # "dataset_id" "dataset_type"
 def analyze_catalog():
     # self.get_ee_catalog()
-    catalog = get_ee_catalog()
+    catalog = read_catalog()
     print("Number of Datasets in Catalog:", len(catalog))
 
     dataset_types = []
@@ -239,18 +232,281 @@ def test_get_info():
     gdf.to_file(outfile, driver="GeoJSON")
 
 
+# =====================================================================
+# Calculate Requests
+# =====================================================================
+
+
+def evaluate_request(result):
+    request_count = 0
+    meta = {}
+
+    static_request_labels = ['type', 'bands', 'id', 'version', 'properties']
+    dynamic_request_labels = ['features']
+
+
+    static_count = 0
+    dynamic_count = 0
+
+    for key, val in result.items():
+        if isinstance(val, list):
+            # for v in val:
+                # print(v)
+            this_count = len(val)
+            # print("{}: \t{}".format(key, len(val)))    
+                
+        elif isinstance(val, dict):
+            this_count = len(list(val.keys()))
+            # print("{}: \t{}".format(key, this_count)
+                
+        else:
+            this_count = 1
+        
+
+        if key in static_request_labels:
+            static_count += this_count
+
+        else:
+            dynamic_count = this_count
+
+        # print("{}: \t{}".format(key, this_count))
+        meta[key] = this_count
+    
+    
+    meta = {'static': static_count, 'dynamic': dynamic_count}
+    
+    # meta['total'] = request_count
+    return meta
+
+
+
+def calculate_requests(dataset):
+    """ Create a script to step into each getInfo function from ee method"""
+    request_calculations = {
+                    'static': 0,
+                    'dynamic': 0,
+                    'delay': 0,
+                    'max_day_range': 0,
+                    'expired': False
+                    }
+
+
+    # Get the current catalog
+    d_type = dataset['dataset_type']
+    d_id = dataset['dataset_id']
+
+    # Find if dataset has expired and set the end date for getInfo filter
+    dataset_end = dataset['dataset_end']
+    if dataset_end is None or dataset_end == 'Present':
+        request_calculations['expired'] = False
+        end = datetime.datetime.today() - datetime.timedelta(days=1)
+    else:
+        request_calculations['expired'] = True
+        end = cs.convert_date(dataset_end)
+
+    
+
+    # Start Day Range at 1 delta from end date 
+    filter_end = end.strftime('%Y-%m-%d')
+    day_range_cap = 10
+    day_range = 1
+    pattern_established = False
+    previous_diff = 0
+    max_diff = 1
+    request_allowed = True
+
+    while not pattern_established and request_allowed:
+        filter_start = (end - datetime.timedelta(days=day_range)).strftime('%Y-%m-%d')
+
+        if d_type == 'ImageCollection':
+            try:
+                res = ee.ImageCollection(d_id).filterDate(filter_start, filter_end)
+                result_info = res.getInfo()
+                meta_info = evaluate_request(result_info)
+                request_calculations['static'] = meta_info['static']
+
+                # Initialize the dynamic counter difference
+                if meta_info['dynamic'] > 0:
+                    current_diff = meta_info['dynamic'] - previous_diff
+                    if request_calculations['delay'] == 0:
+                        request_calculations['delay'] = day_range
+
+
+                    if current_diff == previous_diff:
+                        pattern_established = True
+                        # If there is a consistent feature count in result, then update the delay
+                        request_calculations['delay'] = day_range
+                        request_calculations['dynamic'] = current_diff
+                        # calculate the 5000 element limit 
+                        request_calculations['max_day_range'] = int((5000 - request_calculations['static'])/current_diff)
+                    else:
+                        # update previous diff
+                        previous_diff = meta_info['dynamic']
+                        # store a maximum if the pattern is never established
+                        if current_diff >= max_diff:
+                            max_diff = current_diff
+
+                # Now if we get to the day range cap, and no pattern exists, use the max diff
+                if day_range > day_range_cap and not pattern_established:
+                    # cancel any further requests, to save resources + time
+                    request_allowed = False
+                    # use max diff to get a conservative estimate on the total days we may request
+                    request_calculations['max_day_range'] = int((5000 - request_calculations['static'])/(max_diff))
+                    request_calculations['dynamic'] = max_diff
+
+
+                # and increment day_range, for next test
+                else:
+                    day_range += 1
+
+
+            # END OF TEST to calculate requests to Google Earth Engine
+            except Exception as e:
+                print(e)
+                # Cancel further requests
+                request_allowed = False
+
+
+
+
+        
+        elif d_type == 'Image':
+            try:
+                res = ee.Image(d_id)
+                result_info = res.getInfo()
+                meta_info = evaluate_request(result_info)
+                request_calculations.update(meta_info)
+                break
+
+            except Exception as e:
+                print(e)
+                print("NOT YET DEVELOPED: ", d_type)
+                request_allowed = False
+
+
+        elif d_type == 'FeatureCollection':
+            try:
+                res = ee.FeatureCollection(d_id).filterDate(filter_start, filter_end)
+                result_info = res.getInfo()
+                meta_info = evaluate_request(result_info)
+                request_calculations['static'] = meta_info['static']
+
+                # Initialize the dynamic counter difference
+                if meta_info['dynamic'] > 0:
+                    current_diff = meta_info['dynamic'] - previous_diff
+                    if request_calculations['delay'] == 0:
+                        request_calculations['delay'] = day_range
+
+
+                    if current_diff == previous_diff:
+                        pattern_established = True
+                        # If there is a consistent feature count in result, then update the delay
+                        request_calculations['delay'] = day_range
+                        request_calculations['dynamic'] = current_diff
+                        # calculate the 5000 element limit 
+                        request_calculations['max_day_range'] = int((5000 - request_calculations['static'])/current_diff)
+                    else:
+                        # update previous diff
+                        previous_diff = meta_info['dynamic']
+                        # store a maximum if the pattern is never established
+                        if current_diff >= max_diff:
+                            max_diff = current_diff
+
+
+                # Now if we get to the day range cap, and no pattern exists, use the max diff
+                if day_range > day_range_cap and not pattern_established:
+                    # cancel any further requests, to save resources + time
+                    request_allowed = False
+                    # use max diff to get a conservative estimate on the total days we may request
+                    request_calculations['max_day_range'] = int((5000 - request_calculations['static'])/(max_diff))
+                    request_calculations['dynamic'] = max_diff
+
+
+                # and increment day_range, for next test
+                else:
+                    day_range += 1
+
+
+            # END OF TEST to calculate requests to Google Earth Engine
+            except Exception as e:
+                print(e)
+                # Cancel further requests
+                request_allowed = False
+
+
+        else:
+            print("Not Yet Defined Dataset Type: ", dataset)
+            request_allowed = False
+
+    return request_calculations
+
+
+
+
+
+
 
 def test_ee_catalog_details():
     analyze_catalog()
+
+
+def test_calculate_requests():
+    catalog = read_catalog()
+    # Set the Save File name
+    save_fn = 'gee_catalog'
+    PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    METADATA_DIR = os.path.join(PLUGIN_DIR, "metadata") 
+    filename = os.path.join(METADATA_DIR, save_fn)
+
+    # Test 1: Single ID
+
+    test_id = 'COPERNICUS/S5P/NRTI/L3_NO2'
+
+    for dataset in catalog:
+        if dataset['dataset_id'] == test_id:
+            save_info = calculate_requests(dataset)
+            dataset['request_calculations'] = save_info
+        else:
+            pass
+
+    # Test 2: each dataset type
+
+    d_types_found = ['ImageCollection', 'Image', 'FeatureCollection']
+
+
+    # Build the test set
+    one_of_each = {}
+
+    for dataset in catalog:
+        d_type = dataset['dataset_type']
+        d_id = dataset['dataset_id']
+
+        try:
+            if one_of_each[d_type]:
+                pass
+        except KeyError:
+            if d_type in d_types_found:
+                one_of_each[d_type] = dataset
+
+    for d_type in d_types_found:
+        dataset = one_of_each[d_type]
+        save_info = calculate_requests(dataset)
+        dataset['request_calculations'] = save_info
+
+
+    cs.save_progressive_json(fn=filename, results=catalog)
+
+
+
     
 
 
 
 
+    
+
+
 
 if __name__ == '__main__':
-    test_ee_catalog_details()
-
-
-
+    test_calculate_requests()
 

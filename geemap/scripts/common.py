@@ -1,9 +1,84 @@
 import os, sys
 import json
 import math
+import datetime
 
 import requests
 from bs4 import BeautifulSoup
+
+#==============================================================
+# File saving
+#==============================================================
+
+def save_progressive_json(fn, results, partial=False, total_len=0):
+    """Save this simple metadata to json """
+    ftype = '.json'
+    
+    # if we have partial results, track the last result index
+    if partial:
+        try:
+            assert total_len > 0, "specify total length of file save"
+        except Exception as e:
+            print(e)
+        finally:
+            fn = fn + '_(' + str(len(results)-1) + '_of_' + str(total_len) + ')'
+
+    # Add all
+    fileName = fn + ftype
+
+    with open(fileName, 'w') as outfile:
+        json.dump(results, outfile)
+
+
+#==============================================================
+# Date Conversion
+#==============================================================
+
+
+def convert_date(date):
+    """ Extract the date with the known formats """
+    try:
+        # assert 'dataset_start' in dataset, "No dataset Key"
+        # date = dataset['dataset_start']
+
+        # Check 1: None
+        if date is None:
+            return None
+
+        # Check 2: str(Present)
+        elif date == 'Present':
+            return date
+
+        # Check 3: ISO
+        else:
+            # If this format fails, then Except below to different format
+            date = datetime.datetime.fromisoformat(date)
+
+
+    except KeyError as e:
+        # QMessageBox.information(self, str(e), 'calling get date on wrong dataset or type', QMessageBox.Ok)
+        print(e)
+        print(dataset)
+        date = None
+
+
+    except TypeError as e:
+        print(e)
+        date = None
+
+
+    # Check 4: Use custom strptime, non-ISO
+    except Exception as e:
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+    except:
+        # new Date time format to check!
+        # QMessageBox.information(self, "New DateTime Format", str(date), QMessageBox.Ok)
+        print(date)
+    
+    finally:
+        return date
 
 
 #==============================================================
