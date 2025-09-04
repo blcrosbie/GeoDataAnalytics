@@ -1,8 +1,15 @@
-.env
+# memory
 .DS_Store
-examples/
 .ipynb_checkpoints/
-/hatW/
+data/*/*.json
+data/**/*.zip
+data/**/usa_census_cd/*
+examples/
 
 
+# virtualenv
 */venv/
+
+# private
+.env
+secrets/*
