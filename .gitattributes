@@ -1,0 +1,2 @@
+data/are_shp/hotosm_are_roads_lines_shp/hotosm_are_roads_lines.shp filter=lfs diff=lfs merge=lfs -text
+data/are_shp/hotosm_are_roads_lines_shp/hotosm_are_roads_lines.dbf filter=lfs diff=lfs merge=lfs -text
