@@ -6,6 +6,7 @@ data/*/*.json
 data/**/*.csv
 data/**/*.zip
 data/**/usa_census_cd/*
+data**/are_shp/*
 examples/
 
 
