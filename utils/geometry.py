@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from shapely.geometry import Polygon, MultiPolygon
 
 def get_bearing(lat1, long1, lat2, long2):
     dLon = (long2 - long1)
@@ -36,3 +37,11 @@ def get_bearing_label(angle):
 
     return label
     
+
+def convert_geometry(geom):
+    if geom.geom_type == 'LineString' and geom.is_ring:
+        return Polygon(geom)
+    elif geom.geom_type == 'MultiLineString':
+        polygons = [Polygon(line) for line in geom if line.is_ring]
+        return MultiPolygon(polygons)
+    return geom
