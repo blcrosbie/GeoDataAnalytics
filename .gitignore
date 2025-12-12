@@ -9,6 +9,13 @@ data/**/usa_census_cd/*
 data**/are_shp/*
 examples/
 
+notebooks/*.csv
+notebooks/*.geojson
+notebooks/*.sql
+
+reports/*
+
+data/census/*
 
 # virtualenv
 */venv/
