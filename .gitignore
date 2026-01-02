@@ -22,4 +22,5 @@ data/census/*
 
 # private
 .env
+.env.secret
 secrets/*

@@ -2,77 +2,88 @@ import os
 import bs4
 import requests # type: ignore
 from tqdm import tqdm
+import argparse
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+def download_tiger_data(year: int, shape_type: str):
+    """
+    Downloads TIGER/Line shapefiles from the US Census Bureau for a specific year and shape type.
 
-# Find most recent tiger sets
-base_url = 'https://www2.census.gov/geo/tiger/TIGER2024/'
+    Args:
+        year (int): The year of the TIGER data to download (e.g., 2024).
+        shape_type (str): The TIGER shape type to download (e.g., 'CBSA', 'PLACE', 'TRACT'). Case-insensitive.
+    """
+    
+    # Define the directory on the D: drive and create it if it doesn't exist
+    census_dir = os.path.join('D:\\', 'census')
+    data_dir = os.path.join(census_dir, str(year))
+    os.makedirs(data_dir, exist_ok=True)
+    print(f"Data will be saved to: {data_dir}")
 
-response = requests.get(base_url)
-soup = bs4.BeautifulSoup(response.text, 'html.parser')
+    # Construct the base URL for the given year and shape type
+    shape_type_upper = shape_type.upper()
+    base_url = f'https://www2.census.gov/geo/tiger/TIGER{year}/'
+    select_path = f'{base_url}{shape_type_upper}/'
 
-# Search through all TIGER sets in URL Path
-all_boundaries = soup.find_all('a')
-all_paths = []
-for item in all_boundaries:
-    caps_text = item.text.upper()
-    if caps_text == item.text and item.text != '' and ' ' not in item.text:
-        all_paths.append(f"{base_url}{item.text}")
-
-
-# Manual selection of paths (for simpler approach)
-select_paths = [
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/CBSA/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/CD/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/COASTLINE/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/CONCITY/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/COUNTY/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/COUSUB/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/CSA/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/EDGES/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/INTERNATIONALBOUNDARY/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/PLACE/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/PRISECROADS/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/PUMA20/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/RAILS/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/ROADS/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/STATE/',
-    'https://www2.census.gov/geo/tiger/TIGER2024/TRACT/',
-    # 'https://www2.census.gov/geo/tiger/TIGER2024/ZCTA520/'
-]
-
-# Create a Lookup of all Zip file locations on site to their respective TIGER dataset
-page_paths = {}
-for path_url in select_paths:
+    # Create a Lookup of all Zip file locations on site to their respective TIGER dataset
+    page_paths = {}
+    
     # Access page with zip files
-    path_response = requests.get(path_url)
+    try:
+        path_response = requests.get(select_path)
+        path_response.raise_for_status()  # Will raise an HTTPError for bad responses (4xx or 5xx)
+    except requests.exceptions.RequestException as e:
+        print(f"Error accessing {select_path}: {e}")
+        return
+
     soup = bs4.BeautifulSoup(path_response.text, 'html.parser')
     all_zips_on_page = soup.find_all('a')
 
-    page_paths[path_url] = []
+    page_paths[select_path] = []
 
     for item in all_zips_on_page:
-        # print(item)
         if item.text.endswith('.zip'):
-            page_paths[path_url].append(f"{path_url}{item.text}")
-    print(f"Done with {path_url}")
-
-# Create Lookup of each TIGER set to each .zip found on its subpage and download each .zip
-for zippage, zipurls in page_paths.items():
-    print(f"START: {zippage.split('/')[-1]}\t{len(zipurls)} files to download")
-    count = 0
-    for zipurl in zipurls:
-        save_fn = os.path.join(DATA_DIR, zipurl.split('/')[-1])
-        with requests.get(zipurl, stream=True) as zfile:
-            zfile.raise_for_status()
-            with open(save_fn, 'wb') as f:
-                for chunk in zfile.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                f.close()
-        count += 1
-        if count % 100 == 0:
-            print(f"Progress: {round(count/len(zipurls), 2) * 100}%\t\t{count}/{len(zipurls)} Complete")
-
-    print(f"END: {zippage}\n\n")
+            zip_url = f"{select_path}{item.text}"
+            save_fn = os.path.join(data_dir, item.text)
             
+            # Check if the file already exists before adding to download list
+            if not os.path.exists(save_fn):
+                page_paths[select_path].append(zip_url)
+
+    print(f"Found {len(page_paths[select_path])} files to download for {shape_type_upper}.")
+
+    # Download each .zip file
+    for zippage, zipurls in page_paths.items():
+        if not zipurls:
+            print(f"No new files to download for {zippage.split('/')[-2]}.")
+            continue
+            
+        print(f"\nSTART: {zippage.split('/')[-2]}\t{len(zipurls)} files to download")
+        
+        for zipurl in tqdm(zipurls, desc=f"Downloading {shape_type_upper}"):
+            save_fn = os.path.join(data_dir, zipurl.split('/')[-1])
+            try:
+                with requests.get(zipurl, stream=True) as zfile:
+                    zfile.raise_for_status()
+                    with open(save_fn, 'wb') as f:
+                        for chunk in zfile.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+            except requests.exceptions.RequestException as e:
+                print(f"Failed to download {zipurl}: {e}")
+                # Optional: clean up partially downloaded file
+                if os.path.exists(save_fn):
+                    os.remove(save_fn)
+            except IOError as e:
+                print(f"Failed to write file {save_fn}: {e}")
+
+    print(f"END: {select_path}\n\n")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Download TIGER/Line shapefiles from the US Census Bureau.")
+    parser.add_argument("year", type=int, help="The year of the TIGER data to download (e.g., 2024).")
+    parser.add_argument("shape", type=str, help="The TIGER shape type to download (e.g., 'CBSA', 'PLACE', 'TRACT'). Case-insensitive.")
+    
+    args = parser.parse_args()
+    
+    download_tiger_data(year=args.year, shape_type=args.shape)
