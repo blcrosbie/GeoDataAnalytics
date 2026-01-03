@@ -2,7 +2,14 @@ import os
 import bs4
 import requests # type: ignore
 from tqdm import tqdm
-import argparse
+import datetime
+
+try:
+    import questionary
+except ImportError:
+    print("'questionary' library is required for the interactive prompt.")
+    print("Please install it using: pip install questionary")
+    exit(1)
 
 def download_tiger_data(year: int, shape_type: str):
     """
@@ -14,8 +21,7 @@ def download_tiger_data(year: int, shape_type: str):
     """
     
     # Define the directory on the D: drive and create it if it doesn't exist
-    census_dir = os.path.join('D:\\', 'census')
-    data_dir = os.path.join(census_dir, str(year))
+    data_dir = os.path.join('D:\\', 'census', str(year))
     os.makedirs(data_dir, exist_ok=True)
     print(f"Data will be saved to: {data_dir}")
 
@@ -80,10 +86,62 @@ def download_tiger_data(year: int, shape_type: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Download TIGER/Line shapefiles from the US Census Bureau.")
-    parser.add_argument("year", type=int, help="The year of the TIGER data to download (e.g., 2024).")
-    parser.add_argument("shape", type=str, help="The TIGER shape type to download (e.g., 'CBSA', 'PLACE', 'TRACT'). Case-insensitive.")
-    
-    args = parser.parse_args()
-    
-    download_tiger_data(year=args.year, shape_type=args.shape)
+    try:
+        # --- Year Selection ---
+        current_year = datetime.date.today().year
+        # Census data is often released for the next year, go back to 2007
+        years = [str(y) for y in range(current_year + 1, 2006, -1)]
+        
+        selected_year_str = questionary.select(
+            "Select the year for TIGER data:",
+            choices=years,
+            use_indicator=True
+        ).ask()
+
+        if not selected_year_str:
+            print("No year selected. Exiting.")
+            exit()
+            
+        selected_year = int(selected_year_str)
+
+        # --- Shape Type Selection ---
+        year_url = f'https://www2.census.gov/geo/tiger/TIGER{selected_year}/'
+        print(f"Fetching available shapefile types from {year_url}...")
+        
+        try:
+            response = requests.get(year_url)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"Could not fetch data for year {selected_year}. Error: {e}")
+            exit()
+
+        soup = bs4.BeautifulSoup(response.text, 'html.parser')
+        
+        shape_types = []
+        for item in soup.find_all('a'):
+            text = item.text.strip()
+            # Directories are all caps and end with a slash
+            if text.endswith('/') and text[:-1].isupper():
+                shape_types.append(text[:-1]) # remove trailing slash
+
+        if not shape_types:
+            print(f"No shapefile types found for {selected_year}. The URL might be incorrect or the page structure has changed.")
+            exit()
+
+        selected_shape_type = questionary.select(
+            f"Select the shapefile type for {selected_year}:",
+            choices=sorted(shape_types),
+            use_indicator=True
+        ).ask()
+
+        if not selected_shape_type:
+            print("No shape type selected. Exiting.")
+            exit()
+
+        # --- Run Download ---
+        download_tiger_data(year=selected_year, shape_type=selected_shape_type)
+
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user. Exiting.")
+    except Exception as e:
+        print(f"\nAn unexpected error occurred: {e}")
