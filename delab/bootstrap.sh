@@ -40,9 +40,9 @@ if ! docker network inspect delab >/dev/null 2>&1; then
   docker network create delab
 fi
 
-JUPYTER_ENV="$INSTALL_DIR/delab/data-engineering/jupyter/.env"
+JUPYTER_ENV="$INSTALL_DIR/delab/jupyter/.env"
 if [ ! -f "$JUPYTER_ENV" ]; then
-  cp "$INSTALL_DIR/delab/data-engineering/jupyter/.env.example" "$JUPYTER_ENV"
+  cp "$INSTALL_DIR/delab/jupyter/.env.example" "$JUPYTER_ENV"
 fi
 
 if [ -z "$JUPYTER_TOKEN" ]; then
@@ -61,9 +61,9 @@ sed -i \
   -e "s/^MKL_NUM_THREADS=.*/MKL_NUM_THREADS=${MKL_NUM_THREADS}/" \
   "$JUPYTER_ENV"
 
-PROXY_ENV="$INSTALL_DIR/delab/data-engineering/proxy/.env"
+PROXY_ENV="$INSTALL_DIR/delab/proxy/.env"
 if [ ! -f "$PROXY_ENV" ]; then
-  cp "$INSTALL_DIR/delab/data-engineering/proxy/.env.example" "$PROXY_ENV"
+  cp "$INSTALL_DIR/delab/proxy/.env.example" "$PROXY_ENV"
 fi
 
 sed -i \
@@ -73,10 +73,10 @@ sed -i \
   -e "s/^NGINX_TEMPLATE=.*/NGINX_TEMPLATE=http.conf.template/" \
   "$PROXY_ENV"
 
-(cd "$INSTALL_DIR/delab/data-engineering/jupyter" && docker compose up -d)
+(cd "$INSTALL_DIR/delab/jupyter" && docker compose up -d)
 
 (
-  cd "$INSTALL_DIR/delab/data-engineering/proxy"
+  cd "$INSTALL_DIR/delab/proxy"
   docker compose up -d nginx
   docker compose run --rm --entrypoint "certbot" certbot certonly \
     --webroot -w /var/www/certbot \
