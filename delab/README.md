@@ -26,6 +26,9 @@ Server quick start
 2) Run:
    - REPO_URL=<your-repo-url> DOMAIN=<your-domain> EMAIL=<your-email> bash delab/bootstrap.sh
 
+Host Nginx note
+- If you already run Nginx on the host, set `USE_HOST_NGINX=true` when running bootstrap.
+
 Bootstrap env file
 - Optional: copy `delab/.env.example` to `delab/.env` and export it before running:
   - set -a; source delab/.env; set +a; bash delab/bootstrap.sh

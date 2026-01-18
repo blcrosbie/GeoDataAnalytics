@@ -7,6 +7,7 @@ DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 JUPYTER_TOKEN="${JUPYTER_TOKEN:-}"
 JUPYTER_PORT="${JUPYTER_PORT:-8888}"
+USE_HOST_NGINX="${USE_HOST_NGINX:-false}"
 OMP_NUM_THREADS="${OMP_NUM_THREADS:-16}"
 OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-16}"
 MKL_NUM_THREADS="${MKL_NUM_THREADS:-16}"
@@ -75,14 +76,17 @@ sed -i \
 
 (cd "$INSTALL_DIR/delab/jupyter" && docker compose up -d)
 
-(
-  cd "$INSTALL_DIR/delab/proxy"
-  docker compose up -d nginx
-  docker compose run --rm --entrypoint "certbot" certbot certonly \
-    --webroot -w /var/www/certbot \
-    -d "$DOMAIN" -m "$EMAIL" --agree-tos --non-interactive
-  sed -i -e "s/^NGINX_TEMPLATE=.*/NGINX_TEMPLATE=https.conf.template/" "$PROXY_ENV"
-  docker compose up -d
-)
-
-echo "Done. Jupyter is available at: https://${DOMAIN}/"
+if [ "$USE_HOST_NGINX" != "true" ]; then
+  (
+    cd "$INSTALL_DIR/delab/proxy"
+    docker compose up -d nginx
+    docker compose run --rm --entrypoint "certbot" certbot certonly \
+      --webroot -w /var/www/certbot \
+      -d "$DOMAIN" -m "$EMAIL" --agree-tos --non-interactive
+    sed -i -e "s/^NGINX_TEMPLATE=.*/NGINX_TEMPLATE=https.conf.template/" "$PROXY_ENV"
+    docker compose up -d
+  )
+  echo "Done. Jupyter is available at: https://${DOMAIN}/"
+else
+  echo "Done. Jupyter is running; configure host Nginx to proxy to http://127.0.0.1:${JUPYTER_PORT}/"
+fi

@@ -17,3 +17,7 @@ Quick start (manual)
    - docker compose up -d
 6) Start auto-renew:
    - docker compose up -d certbot
+
+Port conflicts
+- If host Nginx is already bound to 80/443, use PROXY_HTTP_PORT/PROXY_HTTPS_PORT
+  (defaults 8080/8443) and have host Nginx proxy to those ports instead.

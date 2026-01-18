@@ -47,3 +47,7 @@ Fast path (recommended)
 1) On the server, run:
    - REPO_URL=<your-repo-url> DOMAIN=<your-domain> EMAIL=<your-email> bash delab/bootstrap.sh
 2) Open: https://<your-domain>/
+
+Using host Nginx
+- If Nginx is already installed on the host, run:
+  - REPO_URL=<your-repo-url> DOMAIN=<your-domain> EMAIL=<your-email> USE_HOST_NGINX=true bash delab/bootstrap.sh
