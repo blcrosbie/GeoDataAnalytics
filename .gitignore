@@ -24,3 +24,8 @@ data/census/*
 .env
 .env.secret
 secrets/*
+
+# delab
+delab/**/data/
+delab/**/workspace/
+delab/**/certbot/
