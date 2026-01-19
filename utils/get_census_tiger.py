@@ -39,8 +39,8 @@ def download_tiger_data(year: int, shape_type: str):
         shape_type (str): The TIGER shape type to download (e.g., 'CBSA', 'PLACE', 'TRACT'). Case-insensitive.
     """
     
-    # Define the directory on the D: drive and create it if it doesn't exist
-    data_dir = os.path.join('D:\\', 'census', str(year))
+    # Store downloads under the repo's data/census folder
+    data_dir = os.path.join('data', 'census', str(year))
     os.makedirs(data_dir, exist_ok=True)
     print(f"Data will be saved to: {data_dir}")
 
