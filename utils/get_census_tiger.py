@@ -1,6 +1,7 @@
 import os
 import bs4
 import requests # type: ignore
+from pathlib import Path
 from tqdm import tqdm
 import datetime
 import concurrent.futures
@@ -40,8 +41,12 @@ def download_tiger_data(year: int, shape_type: str):
     """
     
     # Store downloads under the repo's data/census folder
-    data_dir = os.path.join('data', 'census', str(year))
-    os.makedirs(data_dir, exist_ok=True)
+    current_file = Path(__file__).resolve()
+    repo_root = current_file.parent.parent
+
+    # This will always be /home/brandon/.../GeoDataAnalytics/data/census/2025
+    data_dir = repo_root / 'data' / 'census' / str(year)
+    data_dir.mkdir(parents=True, exist_ok=True)
     print(f"Data will be saved to: {data_dir}")
 
     # Construct the base URL for the given year and shape type
