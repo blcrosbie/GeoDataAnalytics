@@ -23,24 +23,24 @@ def load_env():
     load_dotenv()
     
     # Source DB connection
-    source_config = {
-        'host': os.getenv('SOURCE_HOST'),
-        'port': os.getenv('SOURCE_PORT', '5432'),
-        'database': os.getenv('SOURCE_DB_NAME'),
-        'user': os.getenv('SOURCE_USER'),
-        'password': os.getenv('SOURCE_PASSWORD')
+    external_config = {
+        'host': os.getenv('EXTERNAL_HOST'),
+        'port': os.getenv('EXTERNAL_PORT', '5432'),
+        'database': os.getenv('EXTERNAL_DB_NAME'),
+        'user': os.getenv('EXTERNAL_USER'),
+        'password': os.getenv('EXTERNAL_PASSWORD')
     }
     
     # Target DB connection
-    target_config = {
-        'host': os.getenv('TARGET_HOST', 'localhost'),
-        'port': os.getenv('TARGET_PORT', '5432'),
-        'database': os.getenv('TARGET_DB_NAME'),
-        'user': os.getenv('TARGET_USER'),
-        'password': os.getenv('TARGET_PASSWORD')
+    local_config = {
+        'host': os.getenv('LOCAL_HOST', 'localhost'),
+        'port': os.getenv('LOCAL_PORT', '5432'),
+        'database': os.getenv('LOCAL_DB_NAME'),
+        'user': os.getenv('LOCAL_USER'),
+        'password': os.getenv('LOCAL_PASSWORD')
     }
     
-    return source_config, target_config
+    return local_config, external_config
 
 def test_connection(config, db_name):
     """Test database connection"""
@@ -116,11 +116,11 @@ def main():
     logger.info("Starting database transfer process")
     
     # Load environment
-    source_config, target_config = load_env()
+    local_config, external_config = load_env()
     
     # Validate required environment variables
-    required_vars = ['SOURCE_HOST', 'SOURCE_DB_NAME', 'SOURCE_USER', 'SOURCE_PASSWORD',
-                     'TARGET_DB_NAME', 'TARGET_USER', 'TARGET_PASSWORD']
+    required_vars = ['EXTERNAL_HOST', 'EXTERNAL_DB_NAME', 'EXTERNAL_USER', 'EXTERNAL_PASSWORD',
+                     'LOCAL_DB_NAME', 'LOCAL_USER', 'LOCAL_PASSWORD']
     
     for var in required_vars:
         if not os.getenv(var):
@@ -128,15 +128,15 @@ def main():
             sys.exit(1)
     
     # Test connections
-    if not test_connection(source_config, "source"):
+    if not test_connection(local_config, "local"):
         sys.exit(1)
-    if not test_connection(target_config, "target"):
+    if not test_connection(external_config, "external"):
         sys.exit(1)
     
-    # Connect to databases
+    # Connect to databases (adjust based on need, source is external this run, and target is local)
     try:
-        source_conn = psycopg2.connect(**source_config)
-        target_conn = psycopg2.connect(**target_config)
+        source_conn = psycopg2.connect(**external_config)
+        target_conn = psycopg2.connect(**local_config)
         
         # Tables to transfer (in dependency order)
         tables = ['borders', 'hexes', 'hexes_borders']
