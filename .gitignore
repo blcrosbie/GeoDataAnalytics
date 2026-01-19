@@ -32,5 +32,5 @@ delab/**/certbot/
 
 
 # virtual envs
-/.transfer
-/.utils
+transfer/.transfer
+utils/.utils
