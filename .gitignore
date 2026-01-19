@@ -29,3 +29,8 @@ secrets/*
 delab/**/data/
 delab/**/workspace/
 delab/**/certbot/
+
+
+# virtual envs
+/.transfer
+/.utils
