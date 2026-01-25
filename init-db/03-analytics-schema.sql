@@ -89,7 +89,10 @@ CREATE INDEX IF NOT EXISTS idx_trending_attributes_score
 CREATE INDEX IF NOT EXISTS idx_reputation_events_user 
     ON analytics.reputation_events (user_id, created_at);
 
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA analytics TO geoagent;
+-- Grant permissions to geoagent user
 GRANT USAGE ON SCHEMA analytics TO geoagent;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA analytics TO geoagent;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA analytics TO geoagent;
+ALTER DEFAULT PRIVILEGES IN SCHEMA analytics GRANT ALL ON TABLES TO geoagent;
 
 COMMIT;
