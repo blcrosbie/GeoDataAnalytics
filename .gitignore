@@ -21,6 +21,7 @@ data/census/*
 
 # virtualenv
 */venv/
+geo_env/
 
 # private
 .env
