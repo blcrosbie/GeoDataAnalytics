@@ -1,6 +1,6 @@
 services:
   jupyter:
-    image: quay.io/jupyter/datascience-notebook:python-3.11
+    image: jupyter/datascience-notebook:latest
     restart: unless-stopped
     ports:
       - "${JUPYTER_PORT:-8888}:8888"
@@ -13,13 +13,15 @@ services:
       OMP_NUM_THREADS: ${OMP_NUM_THREADS:-16}
       OPENBLAS_NUM_THREADS: ${OPENBLAS_NUM_THREADS:-16}
       MKL_NUM_THREADS: ${MKL_NUM_THREADS:-16}
+      CHOWN_HOME: "yes"
+      CHOWN_HOME_OPTS: "-R"
     volumes:
       - ${JUPYTER_WORKDIR:-./workspace}:/home/jovyan/work
-      - ${JUPYTER_DATA_DIR:-./data}:/home/jovyan/data
+      - /home/brandon/dev/blcrosbie/GeoDataAnalytics/data:/home/jovyan/data
     shm_size: "2gb"
     command: >
       start-notebook.py
-      --ServerApp.root_dir=/home/jovyan/work
+      --ServerApp.root_dir=/home/jovyan
       --ServerApp.allow_remote_access=True
       --ServerApp.ip=0.0.0.0
       --ServerApp.port=8888
