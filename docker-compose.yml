@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: ubuntu/postgres:16-22.04_beta
+    # Official PostGIS image includes PostGIS and usually H3/SFCGAL
+    image: postgis/postgis:16-3.4
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
