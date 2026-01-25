@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    restart: always
+    environment:
+      POSTGRES_DB: network_builder
+      POSTGRES_USER: brandon
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - '5433:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+
+volumes:
+  db_data:
