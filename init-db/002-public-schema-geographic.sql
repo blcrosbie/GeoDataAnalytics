@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS public.geographic_boundaries (
     accuracy_meters                DECIMAL(10,2),
     validity_start_date            DATE,
     validity_end_date              DATE,
-    metadata                       JSONB,
+    layer_id                       UUID,
+    source_upload_id               UUID,
+    attributes                     JSONB,
     last_updated                   TIMESTAMPTZ DEFAULT NOW(),
     created_at                     TIMESTAMPTZ DEFAULT NOW(),
     
@@ -33,7 +35,13 @@ CREATE INDEX IF NOT EXISTS idx_geographic_boundaries_country_type
 
 -- GIN index on JSONB metadata for flexible queries
 CREATE INDEX IF NOT EXISTS idx_geographic_boundaries_metadata
-    ON public.geographic_boundaries USING GIN (metadata);
+    ON public.geographic_boundaries USING GIN (attributes);
+
+CREATE INDEX IF NOT EXISTS idx_geographic_boundaries_layer_id
+    ON public.geographic_boundaries (layer_id);
+
+CREATE INDEX IF NOT EXISTS idx_geographic_boundaries_source_upload_id
+    ON public.geographic_boundaries (source_upload_id);
 
 CREATE TABLE IF NOT EXISTS public.geographic_data (
     id                             BIGSERIAL PRIMARY KEY,
@@ -46,7 +54,9 @@ CREATE TABLE IF NOT EXISTS public.geographic_data (
     source                         VARCHAR(128),
     collection_date                DATE,
     confidence_level               VARCHAR(32),
-    metadata                       JSONB,
+    layer_id                       UUID,
+    source_upload_id               UUID,
+    attributes                     JSONB,
     created_at                     TIMESTAMPTZ DEFAULT NOW(),
     updated_at                     TIMESTAMPTZ DEFAULT NOW()
 );
@@ -69,7 +79,13 @@ CREATE INDEX IF NOT EXISTS idx_geographic_data_numeric_value
 
 -- GIN index on metadata for flexible queries
 CREATE INDEX IF NOT EXISTS idx_geographic_data_metadata
-    ON public.geographic_data USING GIN (metadata);
+    ON public.geographic_data USING GIN (attributes);
+
+CREATE INDEX IF NOT EXISTS idx_geographic_data_layer_id
+    ON public.geographic_data (layer_id);
+
+CREATE INDEX IF NOT EXISTS idx_geographic_data_source_upload_id
+    ON public.geographic_data (source_upload_id);
 
 -- Composite index for common query patterns
 CREATE INDEX IF NOT EXISTS idx_geographic_data_key_year_type
