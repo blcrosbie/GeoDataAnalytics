@@ -19,6 +19,13 @@ services:
       apt-get install -y postgresql-16-postgis-3 postgresql-16-h3 &&
       docker-entrypoint.sh postgres
       "
+    networks:
+      - delab
 
 volumes:
   geoagent_db_data:
+
+networks:
+  delab:
+    name: delab
+    external: true
