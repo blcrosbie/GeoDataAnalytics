@@ -18,18 +18,24 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_HOST: postgres
+      POSTGRES_SSL_MODE: ${POSTGRES_SSL_MODE:-require}
+      POSTGRES_SSL_CERT: ${POSTGRES_SSL_CERT:-}
+      POSTGRES_SSL_KEY: ${POSTGRES_SSL_KEY:-}
+      POSTGRES_SSL_CA: ${POSTGRES_SSL_CA:-}
     volumes:
       - ${JUPYTER_WORKDIR:-./workspace}:/home/jovyan/work
       - /home/brandon/dev/blcrosbie/GeoDataAnalytics/data:/home/jovyan/data
+      - ./requirements.txt:/home/jovyan/requirements.txt
     shm_size: "2gb"
     command: >
+      bash -c "pip install -r /home/jovyan/requirements.txt && 
       start-notebook.py
       --ServerApp.root_dir=/home/jovyan
       --ServerApp.allow_remote_access=True
       --ServerApp.ip=0.0.0.0
       --ServerApp.port=8888
-      --ServerApp.base_url=${JUPYTER_BASE_URL:-/}
+      --ServerApp.base_url=${JUPYTER_BASE_URL:-/}"
     networks:
       - delab
 
