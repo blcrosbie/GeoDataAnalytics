@@ -18,6 +18,7 @@ notebooks/*.sql
 reports/*
 
 data/census/*
+data/census_surveys/*
 
 # virtualenv
 */venv/

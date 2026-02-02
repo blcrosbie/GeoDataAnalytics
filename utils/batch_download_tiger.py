@@ -135,8 +135,12 @@ def main():
     years = list(range(2010, 2026))  # Start with just one year for testing
     
     # Specific boundary types to download (matching other upsert script)
-    #boundary_types = ['place', 'tract', 'county', 'state', 'zcta520']
-    boundary_types = ['areawater']
+    # boundary_types = ['place', 'tract', 'county', 'state', 'zcta520']  # run 1
+    # boundary_types = ['areawater']  # run 2
+    # boundary_types = ['cbsa', 'cd'] # run 3
+    # boundary_types = ['arealm', 'bg']  # run 4
+    # boundary_types = ['sldl', 'sldu']  # run 5
+    boundary_types = ['roads', 'linearwater']  # run 6
 
     print("Starting batch download of Census TIGER data")
     print(f"Testing with year: {years[0]}")
