@@ -27,6 +27,7 @@ services:
       - ${JUPYTER_WORKDIR:-./workspace}:/home/jovyan/work
       - /home/brandon/dev/blcrosbie/GeoDataAnalytics/data:/home/jovyan/data
       - ./requirements.txt:/home/jovyan/requirements.txt
+      - /home/brandon/dev/blcrosbie/GeoDataAnalytics/scripts:/home/jovyan/scripts
     shm_size: "2gb"
     command: >
       bash -c "pip install -r /home/jovyan/requirements.txt && 
