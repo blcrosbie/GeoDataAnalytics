@@ -16,8 +16,11 @@ except ImportError:
 def _download_worker(file_url, data_dir):
     """Helper function to download a single file."""
     save_fn = os.path.join(data_dir, file_url.split('/')[-1])
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
     try:
-        with requests.get(file_url, stream=True) as response:
+        with requests.get(file_url, stream=True, headers=headers) as response:
             response.raise_for_status()
             with open(save_fn, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
@@ -71,8 +74,11 @@ def get_survey_descriptions():
 def get_available_surveys():
     """Fetch available survey programs from Census Bureau."""
     base_url = 'https://www2.census.gov/programs-surveys/'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
     try:
-        response = requests.get(base_url)
+        response = requests.get(base_url, headers=headers)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Error accessing {base_url}: {e}")
@@ -96,8 +102,11 @@ def get_available_surveys():
 def get_survey_datasets(survey_code):
     """Get available datasets for a specific survey."""
     survey_url = f'https://www2.census.gov/programs-surveys/{survey_code}/'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
     try:
-        response = requests.get(survey_url)
+        response = requests.get(survey_url, headers=headers)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Error accessing {survey_url}: {e}")
@@ -126,8 +135,12 @@ def crawl_and_download(base_url: str, data_dir: Path, survey_code: str, path_par
     if path_parts is None:
         path_parts = []
     
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
     try:
-        response = requests.get(base_url)
+        response = requests.get(base_url, headers=headers)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Error accessing {base_url}: {e}")
@@ -218,9 +231,13 @@ def scrape_survey_documentation(survey_code):
         f'https://www.census.gov/programs-surveys/{survey_code}/'
     ]
     
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
     for doc_url in doc_urls:
         try:
-            response = requests.get(doc_url)
+            response = requests.get(doc_url, headers=headers)
             response.raise_for_status()
             print(f"Found documentation at: {doc_url}")
             return doc_url

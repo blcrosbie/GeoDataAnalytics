@@ -1,5 +1,6 @@
 attrs==25.4.0
 beautifulsoup4==4.14.3
+boto3==1.36.16
 certifi==2026.1.4
 charset-normalizer==3.4.4
 click==8.3.1
@@ -8,6 +9,7 @@ cligj==0.7.2
 colorama==0.4.6
 fiona==1.10.1
 GeoAlchemy2==0.18.1
+geopandas==1.0.1
 greenlet==3.3.1
 idna==3.11
 numpy==2.4.1
@@ -20,6 +22,7 @@ pyshp==3.0.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 questionary==2.1.1
+rasterio==1.4.3
 requests==2.32.5
 shapely==2.1.2
 six==1.17.0
