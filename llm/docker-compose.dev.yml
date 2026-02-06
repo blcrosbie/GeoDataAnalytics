@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    container_name: geodata_postgres_dev
+    environment:
+      POSTGRES_DB: geodata_analytics_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+      - ./data:/data
+      - ./docker/postgres/postgresql_dev.conf:/etc/postgresql/postgresql.conf
+    networks:
+      - geodata_dev_network
+    restart: unless-stopped
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+
+  redis:
+    image: redis:7-alpine
+    container_name: geodata_redis_dev
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - geodata_dev_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass devredis
+
+  minio:
+    image: minio/minio:latest
+    container_name: geodata_minio_dev
+    environment:
+      MINIO_ROOT_USER: devadmin
+      MINIO_ROOT_PASSWORD: devadmin123
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - geodata_dev_network
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: geodata_pgadmin_dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@geodata.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json
+    networks:
+      - geodata_dev_network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  jupyter:
+    image: jupyter/scipy-notebook:latest
+    container_name: geodata_jupyter_dev
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      JUPYTER_TOKEN: "devgeodata"
+    ports:
+      - "8889:8888"
+    volumes:
+      - ./python:/home/jovyan/work
+      - ./data:/home/jovyan/data
+      - ./reports:/home/jovyan/reports
+      - ./docker/jupyter/jupyter_dev_config.py:/home/jovyan/.jupyter/jupyter_config.py
+    networks:
+      - geodata_dev_network
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  minio_dev_data:
+  pgadmin_dev_data:
+
+networks:
+  geodata_dev_network:
+    driver: bridge
