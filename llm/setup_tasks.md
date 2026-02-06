@@ -1,230 +1,151 @@
-# GeoAgent LLM (Text-to-SQL) Setup Tasks
+# GeoDataAnalytics Project Setup Tasks
 
-This document defines a **simple, opensource, local-first** workflow for standing up a Text-to-SQL
-service (Postgres + PostGIS) using **Ollama, vLLM, or TGI**, and iteratively improving it
-via evaluation and optional fine-tuning.
-
-The goal is to avoid per-request API costs, ship something usable quickly, and
-improve quality over time with real data.
-
----
-
-## Repository Structure
-
-Create a dedicated subdirectory in your GeoAgent repo:
+## Directory Structure
 
 ```
-/llm/
-  README_TASKS.md
-  .env.example
-  docker/
-    docker-compose.vllm.yml
-    docker-compose.tgi.yml
-    docker-compose.ollama.yml
-  models/
-    ollama/
-      Modelfile
-      NOTES.md
-    hf/
-  prompts/
-    system_postgis.md
-    fewshot/
-  schema/
-    ddl/
-    introspection/
-  datasets/
-    raw/
-    curated/
-    splits/
-    format.md
-  eval/
-    cases/
-    harness.py
-    reports/
-  server/
-    geoagent_sql_proxy.py
-    sql_guard.py
-  notebooks/
-    postgis_text2sql_data_prep.ipynb
-  scripts/
-    export_schema.sh
-    run_vllm.sh
-    run_tgi.sh
-    run_ollama.sh
-    build_dataset.py
-    run_eval.py
-  logs/
-    model_requests.jsonl
-    model_failures.jsonl
+GeoDataAnalytics/
+├── llm/                              # Main project directory
+│   ├── sql/                          # SQL test scripts
+│   │   ├── test_flood_exposure.sql
+│   │   ├── test_weather_extreme_rain.sql
+│   │   ├── test_heat_sun_wind.sql
+│   │   ├── test_air_quality_ghg.sql
+│   │   ├── test_neighborhood_trends.sql
+│   │   ├── test_geographic_validation.sql
+│   │   ├── test_vectorization_mvt_performance.sql
+│   │   ├── test_framework_schema.sql
+│   │   └── test_data_fixtures.sql
+│   ├── python/                       # Python utilities
+│   │   ├── test_runner.py
+│   │   ├── requirements.txt
+│   │   └── config/
+│   │       └── database_config.py
+│   ├── docker/                       # Docker configurations
+│   │   ├── docker-compose.yml
+│   │   ├── docker-compose.dev.yml
+│   │   ├── docker-compose.prod.yml
+│   │   └── postgres/
+│   │       ├── Dockerfile
+│   │       └── init.sql
+│   ├── data/                         # Test data and fixtures
+│   │   ├── fixtures/
+│   │   ├── samples/
+│   │   └── external/
+│   ├── reports/                      # Test reports
+│   │   ├── html/
+│   │   ├── json/
+│   │   └── logs/
+│   ├── docs/                         # Documentation
+│   │   ├── api/
+│   │   ├── deployment/
+│   │   └── user_guide/
+│   ├── scripts/                      # Utility scripts
+│   │   ├── setup.sh
+│   │   ├── backup.sh
+│   │   └── cleanup.sh
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── README.md
+│   └── setup_tasks.md
+├── etl/                              # ETL pipeline components
+│   ├── extract/
+│   ├── transform/
+│   └── load/
+├── api/                              # REST API services
+│   ├── fastapi/
+│   └── flask/
+├── frontend/                         # Web interface
+│   ├── react/
+│   └── vue/
+└── infrastructure/                   # Cloud infrastructure
+    ├── terraform/
+    └── kubernetes/
 ```
 
----
+## Setup Tasks
 
-## Phase 0 — Decide Serving Path
+### Phase 1: Core Infrastructure
+- [ ] Create directory structure
+- [ ] Set up PostgreSQL with PostGIS
+- [ ] Configure Docker containers
+- [ ] Initialize database schema
+- [ ] Create test data fixtures
 
-Start with **one** serving backend.
+### Phase 2: Test Framework
+- [ ] Implement SQL test scripts
+- [ ] Develop Python test runner
+- [ ] Set up reporting system
+- [ ] Configure CI/CD pipeline
+- [ ] Add performance monitoring
 
-- **Ollama** — fastest setup, best dev loop
-- **vLLM** — OpenAI-compatible API, higher throughput
-- **TGI** — Docker-first, production-style serving
+### Phase 3: ETL Pipeline
+- [ ] Build data extraction modules
+- [ ] Implement transformation logic
+- [ ] Create data loading procedures
+- [ ] Add data validation checks
+- [ ] Set up scheduling system
 
-**Recommendation:** start with Ollama, migrate to vLLM once prompts and eval stabilize.
+### Phase 4: API & Frontend
+- [ ] Develop REST API endpoints
+- [ ] Create web interface
+- [ ] Implement authentication
+- [ ] Add visualization components
+- [ ] Set up monitoring
 
----
+### Phase 5: Production Deployment
+- [ ] Configure production database
+- [ ] Set up load balancing
+- [ ] Implement backup strategy
+- [ ] Configure monitoring alerts
+- [ ] Document deployment process
 
-## Phase 1 — Model Selection
+## Docker Compose Files
 
-Criteria:
-- Decent SQL generation
-- Fits on RTX 3070 (8 GB VRAM)
-- Commercially usable license
+### Development Environment
+- PostgreSQL with PostGIS
+- Redis for caching
+- MinIO for S3-compatible storage
+- Jupyter notebooks for development
 
-Start with an existing SQL-capable model; do not train from scratch.
+### Production Environment
+- PostgreSQL cluster with replication
+- Redis cluster
+- NGINX load balancer
+- Application containers
 
-Keep a `models/ollama/NOTES.md` file documenting:
-- model name
-- source URL
-- license
-- known limitations
+## Environment Variables
 
----
+### Database Configuration
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
 
-## Phase 2 — Ollama Setup
+### Application Settings
+- `ENVIRONMENT` (dev/staging/prod)
+- `LOG_LEVEL`
+- `API_KEY`
+- `SECRET_KEY`
 
-1. Install Ollama
-2. Create a custom model using a Modelfile
+### External Services
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `S3_BUCKET_NAME`
+- `REDIS_URL`
 
-Example `models/ollama/Modelfile`:
+## Security Considerations
 
-```
-FROM <base-model>
+- Use environment variables for sensitive data
+- Implement database connection pooling
+- Set up proper authentication
+- Configure HTTPS in production
+- Regular security updates
 
-SYSTEM """
-You are a Postgres + PostGIS SQL generator.
-Rules:
-- Output SQL only
-- SELECT queries only
-- Always include LIMIT
-- Use PostGIS functions only from an allowlist
-- Never modify data
-"""
-```
+## Performance Optimization
 
-Create and run:
-```
-ollama create geoagent-sql -f Modelfile
-ollama run geoagent-sql
-```
-
----
-
-## Phase 3 — vLLM Setup
-
-Use vLLM when you want an OpenAI-compatible API.
-
-Example:
-```
-vllm serve <hf-model-id> --dtype auto --api-key local-token
-```
-
-GeoAgent points to:
-- base_url: http://localhost:8000/v1
-- api_key: local-token
-
----
-
-## Phase 4 — Dataset Format
-
-Define a single JSONL format and stick to it.
-
-Example record:
-```
-{
-  "id": "case_001",
-  "question": "Which hexes intersect FEMA flood zones?",
-  "schema_context": "CREATE TABLE ...",
-  "constraints": {
-    "read_only": true,
-    "limit_required": true,
-    "allowed_postgis": ["ST_Intersects","ST_DWithin"]
-  },
-  "sql_gold": "SELECT ... LIMIT 200;"
-}
-```
-
-Start with ~200 hand-validated examples.
-
----
-
-## Phase 5 — Guardrails (Mandatory)
-
-Implement SQL validation before execution:
-
-- SELECT-only
-- single statement
-- LIMIT enforced
-- table/column allowlist
-- restricted PostGIS function list
-
-Files:
-- `server/sql_guard.py`
-- `server/geoagent_sql_proxy.py`
-
-The proxy:
-1. Receives question
-2. Calls model
-3. Validates SQL
-4. Executes with read-only DB role
-5. Returns rows or error
-
----
-
-## Phase 6 — Evaluation Harness
-
-Build an evaluation harness that measures:
-- SQL validity
-- Execution success
-- Safety compliance
-- Latency
-
-Store reports under `eval/reports/`.
-
-Run this in CI once stable.
-
----
-
-## Phase 7 — Fine-Tuning (Optional)
-
-Only fine-tune after collecting ≥1,000 curated examples.
-
-Use LoRA / QLoRA:
-- small GPU footprint
-- teaches schema + PostGIS patterns
-- avoids full retraining
-
-Never fine-tune on unreviewed data.
-
----
-
-## Phase 8 — GeoAgent Integration
-
-Add a config-driven router:
-```
-LLM_PROVIDER=ollama|vllm|tgi|openai
-```
-
-Log every request and final SQL:
-- `logs/model_requests.jsonl`
-- `logs/model_failures.jsonl`
-
-These logs become future training data.
-
----
-
-## Definition of Done
-
-- Local inference, no per-request API cost
-- Valid Postgres + PostGIS SQL for top intents
-- Guardrails prevent unsafe queries
-- Eval harness shows measurable improvement
-- Clear upgrade path to fine-tuning
+- Database indexing strategy
+- Query optimization
+- Caching layer implementation
+- Connection pooling
+- Load balancing configuration
