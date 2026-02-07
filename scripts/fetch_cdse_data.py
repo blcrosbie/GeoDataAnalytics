@@ -19,6 +19,7 @@ import boto3
 import rasterio
 from dotenv import load_dotenv
 import base64
+from storage_utils import StorageManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +51,13 @@ class CDSEDataFetcher:
             region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
         )
         self.bucket_name = os.getenv('S3_BUCKET_NAME')
+        
+        # Storage Configuration
+        current_file = Path(__file__).resolve()
+        repo_root = current_file.parent.parent
+        data_dir = repo_root / 'data'
+        storage_limit_gb = float(os.getenv('STORAGE_LIMIT_GB', '50'))
+        self.storage_manager = StorageManager(data_dir, storage_limit_gb)
         
         # Authentication
         self.access_token = None
@@ -96,6 +104,10 @@ class CDSEDataFetcher:
     def get_s3_path(self, source: str, dataset: str, year: str, month: str, filename: str) -> str:
         """Generate S3 key for storing data"""
         return f"copernicus/raw/source={source}/dataset={dataset}/year={year}/month={month}/{filename}"
+    
+    def get_local_path(self, dataset: str, year: str, month: str, filename: str) -> Path:
+        """Generate local file path for storage"""
+        return self.storage_manager.get_local_path('cdse', dataset, year, month, filename)
     
     def store_manifest(self, request_key: str, manifest_data: Dict):
         """Store request manifest to S3"""
@@ -189,10 +201,48 @@ class CDSEDataFetcher:
         
         product_id = product_info['Id']
         product_name = product_info['Name']
+        dataset = 'SENTINEL-2'
         
         # Generate request key
         request_str = json.dumps(product_info, sort_keys=True)
         request_key = hashlib.sha256(request_str.encode()).hexdigest()[:16]
+        
+        # Generate paths
+        filename = f"{product_name}.zip"
+        local_path = self.get_local_path(dataset, year, month, filename)
+        s3_path = self.get_s3_path('cdse', dataset, year, month, filename)
+        
+        # Log storage status
+        self.storage_manager.log_storage_status()
+        
+        # Check if file already exists locally
+        if local_path.exists():
+            logger.info(f"File already exists locally: {local_path}")
+            # Upload to S3 if not already there
+            try:
+                self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_path)
+                logger.info(f"File also exists in S3: {s3_path}")
+                return s3_path
+            except:
+                logger.info(f"Local file exists, uploading to S3: {local_path}")
+                self.s3_client.upload_file(str(local_path), self.bucket_name, s3_path)
+                return s3_path
+        
+        # Check if file already exists in S3
+        try:
+            self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_path)
+            logger.info(f"File already exists in S3: {s3_path}")
+            return s3_path
+        except:
+            logger.info(f"Downloading new product: {product_name}")
+        
+        # Ensure local storage space
+        estimated_size = 500 * 1024 * 1024  # Estimate 500MB for Sentinel-2 products
+        if not self.storage_manager.ensure_storage_space(estimated_size, 'cdse'):
+            raise RuntimeError(f"Insufficient storage space for {filename}")
+        
+        # Create local directory
+        local_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Get download URL
         headers = {'Authorization': f'Bearer {token}'}
@@ -204,26 +254,26 @@ class CDSEDataFetcher:
             response = requests.get(download_url, headers=headers, stream=True)
             response.raise_for_status()
             
-            # Download to temp file
-            temp_filename = f"/tmp/{product_name}.zip"
-            with open(temp_filename, 'wb') as f:
+            # Download to local file
+            with open(local_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
             # Upload to S3
-            s3_path = self.get_s3_path('cdse', 'SENTINEL-2', year, month, f"{product_name}.zip")
-            self.s3_client.upload_file(temp_filename, self.bucket_name, s3_path)
+            self.s3_client.upload_file(str(local_path), self.bucket_name, s3_path)
             
             # Store manifest
+            actual_size = local_path.stat().st_size
             manifest = {
-                'dataset': 'SENTINEL-2',
+                'dataset': dataset,
                 'product_id': product_id,
                 'product_name': product_name,
-                'filename': f"{product_name}.zip",
+                'filename': filename,
+                'local_path': str(local_path),
                 's3_path': s3_path,
                 'request_key': request_key,
                 'fetched_at': datetime.utcnow().isoformat(),
-                'file_size': os.path.getsize(temp_filename),
+                'file_size': actual_size,
                 'product_info': product_info
             }
             self.store_manifest(request_key, manifest)
@@ -231,19 +281,17 @@ class CDSEDataFetcher:
             # Store provenance
             provenance = {
                 'source': 'cdse',
-                'dataset': 'SENTINEL-2',
+                'dataset': dataset,
                 'request_key': request_key,
                 'fetch_timestamp': datetime.utcnow().isoformat(),
                 'processing_stage': 'raw',
                 'data_format': 'SAFE ZIP',
-                'access_method': 'cdse_api'
+                'access_method': 'cdse_api',
+                'local_path': str(local_path)
             }
             self.store_provenance(request_key, provenance)
             
-            # Clean up temp file
-            os.remove(temp_filename)
-            
-            logger.info(f"Downloaded and stored: {s3_path}")
+            logger.info(f"Downloaded and stored: {local_path}")
             return s3_path
             
         except Exception as e:

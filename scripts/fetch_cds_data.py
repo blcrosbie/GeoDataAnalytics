@@ -18,6 +18,7 @@ import boto3
 import xarray as xr
 import pandas as pd
 from dotenv import load_dotenv
+from storage_utils import StorageManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +29,7 @@ class CDSDataFetcher:
         load_dotenv()
         
         # CDS Configuration
-        self.cds_url = os.getenv('CDS_URL', 'https://cds.climate.copernicus.eu/api/v2')
+        self.cds_url = os.getenv('CDS_URL', 'https://cds.climate.copernicus.eu/api')
         self.cds_key = os.getenv('CDS_KEY')
         if not self.cds_key:
             raise ValueError("CDS_KEY environment variable is required")
@@ -43,12 +44,23 @@ class CDSDataFetcher:
         )
         self.bucket_name = os.getenv('S3_BUCKET_NAME')
         
+        # Storage Configuration
+        current_file = Path(__file__).resolve()
+        repo_root = current_file.parent.parent
+        data_dir = repo_root / 'data'
+        storage_limit_gb = float(os.getenv('STORAGE_LIMIT_GB', '50'))
+        self.storage_manager = StorageManager(data_dir, storage_limit_gb)
+        
         # Initialize CDS client
         self.cds_client = cdsapi.Client(url=self.cds_url, key=self.cds_key)
         
     def get_s3_path(self, source: str, dataset: str, year: str, month: str, filename: str) -> str:
         """Generate S3 key for storing data"""
         return f"copernicus/raw/source={source}/dataset={dataset}/year={year}/month={month}/{filename}"
+    
+    def get_local_path(self, dataset: str, year: str, month: str, filename: str) -> Path:
+        """Generate local file path for storage"""
+        return self.storage_manager.get_local_path('cds', dataset, year, month, filename)
     
     def store_manifest(self, request_key: str, manifest_data: Dict):
         """Store request manifest to S3"""
@@ -114,34 +126,61 @@ class CDSDataFetcher:
         request_key = hashlib.sha256(request_str.encode()).hexdigest()[:16]
         
         filename = f"era5_pressure_levels_{year}{month}_{request_key}.nc"
+        local_path = self.get_local_path(dataset, year, month, filename)
         s3_path = self.get_s3_path('cds', dataset, year, month, filename)
         
-        # Check if file already exists
+        # Log storage status
+        self.storage_manager.log_storage_status()
+        
+        # Check if file already exists locally
+        if local_path.exists():
+            logger.info(f"File already exists locally: {local_path}")
+            # Upload to S3 if not already there
+            try:
+                self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_path)
+                logger.info(f"File also exists in S3: {s3_path}")
+                return s3_path
+            except:
+                logger.info(f"Local file exists, uploading to S3: {local_path}")
+                self.s3_client.upload_file(str(local_path), self.bucket_name, s3_path)
+                return s3_path
+        
+        # Check if file already exists in S3
         try:
             self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_path)
-            logger.info(f"File already exists: {s3_path}")
+            logger.info(f"File already exists in S3: {s3_path}")
             return s3_path
         except:
             logger.info(f"Fetching new data for {dataset}")
         
+        # Ensure local storage space
+        estimated_size = 50 * 1024 * 1024  # Estimate 50MB for pressure level data
+        if not self.storage_manager.ensure_storage_space(estimated_size, 'cds'):
+            raise RuntimeError(f"Insufficient storage space for {filename}")
+        
+        # Create local directory
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        
         # Fetch data from CDS
         try:
-            result = self.cds_client.retrieve(dataset, request, filename)
+            result = self.cds_client.retrieve(dataset, request, str(local_path))
             logger.info(f"CDS request completed: {result}")
             
             # Upload to S3
-            self.s3_client.upload_file(filename, self.bucket_name, s3_path)
+            self.s3_client.upload_file(str(local_path), self.bucket_name, s3_path)
             logger.info(f"Uploaded to S3: {s3_path}")
             
             # Store manifest
+            actual_size = local_path.stat().st_size
             manifest = {
                 'dataset': dataset,
                 'request': request,
                 'filename': filename,
+                'local_path': str(local_path),
                 's3_path': s3_path,
                 'request_key': request_key,
                 'fetched_at': datetime.utcnow().isoformat(),
-                'file_size': os.path.getsize(filename)
+                'file_size': actual_size
             }
             self.store_manifest(request_key, manifest)
             
@@ -153,13 +192,12 @@ class CDSDataFetcher:
                 'fetch_timestamp': datetime.utcnow().isoformat(),
                 'processing_stage': 'raw',
                 'data_format': 'netcdf',
-                'access_method': 'cdsapi'
+                'access_method': 'cdsapi',
+                'local_path': str(local_path)
             }
             self.store_provenance(request_key, provenance)
             
-            # Clean up local file
-            os.remove(filename)
-            
+            logger.info(f"Data stored locally and uploaded to S3: {local_path}")
             return s3_path
             
         except Exception as e:
@@ -207,34 +245,61 @@ class CDSDataFetcher:
         request_key = hashlib.sha256(request_str.encode()).hexdigest()[:16]
         
         filename = f"era5_surface_{year}{month}_{request_key}.nc"
+        local_path = self.get_local_path(dataset, year, month, filename)
         s3_path = self.get_s3_path('cds', dataset, year, month, filename)
         
-        # Check if file already exists
+        # Log storage status
+        self.storage_manager.log_storage_status()
+        
+        # Check if file already exists locally
+        if local_path.exists():
+            logger.info(f"File already exists locally: {local_path}")
+            # Upload to S3 if not already there
+            try:
+                self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_path)
+                logger.info(f"File also exists in S3: {s3_path}")
+                return s3_path
+            except:
+                logger.info(f"Local file exists, uploading to S3: {local_path}")
+                self.s3_client.upload_file(str(local_path), self.bucket_name, s3_path)
+                return s3_path
+        
+        # Check if file already exists in S3
         try:
             self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_path)
-            logger.info(f"File already exists: {s3_path}")
+            logger.info(f"File already exists in S3: {s3_path}")
             return s3_path
         except:
-            pass
+            logger.info(f"Fetching new data for {dataset}")
+        
+        # Ensure local storage space
+        estimated_size = 30 * 1024 * 1024  # Estimate 30MB for surface data
+        if not self.storage_manager.ensure_storage_space(estimated_size, 'cds'):
+            raise RuntimeError(f"Insufficient storage space for {filename}")
+        
+        # Create local directory
+        local_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Fetch data from CDS
         try:
-            result = self.cds_client.retrieve(dataset, request, filename)
+            result = self.cds_client.retrieve(dataset, request, str(local_path))
             logger.info(f"CDS request completed: {result}")
             
             # Upload to S3
-            self.s3_client.upload_file(filename, self.bucket_name, s3_path)
+            self.s3_client.upload_file(str(local_path), self.bucket_name, s3_path)
             logger.info(f"Uploaded to S3: {s3_path}")
             
             # Store manifest and provenance
+            actual_size = local_path.stat().st_size
             manifest = {
                 'dataset': dataset,
                 'request': request,
                 'filename': filename,
+                'local_path': str(local_path),
                 's3_path': s3_path,
                 'request_key': request_key,
                 'fetched_at': datetime.utcnow().isoformat(),
-                'file_size': os.path.getsize(filename)
+                'file_size': actual_size
             }
             self.store_manifest(request_key, manifest)
             
@@ -245,13 +310,12 @@ class CDSDataFetcher:
                 'fetch_timestamp': datetime.utcnow().isoformat(),
                 'processing_stage': 'raw',
                 'data_format': 'netcdf',
-                'access_method': 'cdsapi'
+                'access_method': 'cdsapi',
+                'local_path': str(local_path)
             }
             self.store_provenance(request_key, provenance)
             
-            # Clean up local file
-            os.remove(filename)
-            
+            logger.info(f"Data stored locally and uploaded to S3: {local_path}")
             return s3_path
             
         except Exception as e:

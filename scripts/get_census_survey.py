@@ -45,30 +45,96 @@ def get_survey_descriptions():
         'economic-census': 'Economic Census - Comprehensive economic data every 5 years on business activity',
         'abs': 'Annual Business Survey - Annual data on US employer firms, characteristics, finances',
         'ahs': 'American Housing Survey - Biennial housing characteristics survey',
+        'aian': 'American Indian/Alaska Native - Demographic, economic, social data for AI/AN populations',
         'aies': 'Annual Integrated Economic Survey - Replacement for economic census, annual business data',
+        'apes': 'Annual Prototype of Economic Survey - Experimental economic data collection methodology',
+        'arts': 'Arts and Cultural Production Satellite Account - Economic impact of arts and culture',
+        'ase': 'Annual Survey of Entrepreneurs - Data on business ownership by demographic characteristics',
+        'asm': 'Annual Survey of Manufactures - Manufacturing sector statistics, employment, output',
+        'aspp': 'Annual Survey of State and Local Government Finances - Government revenue, expenditure, debt',
+        'awts': 'Annual Wholesale Trade Survey - Wholesale industry sales, inventory, operations data',
+        'bds': 'Business Dynamics Statistics - Business startups, closures, job creation/destruction data',
+        'bps': 'Business Patterns Survey - Business establishment patterns by industry and geography',
+        'brdis': 'Business R&D and Innovation Survey - Business research, development, innovation activities',
+        'brds': 'Business Register and Demographic Statistics - Comprehensive business establishment database',
+        'cffr': 'Consolidated Federal Funds Report - Federal government spending by state, county, program',
+        'cfs': 'Commodity Flow Survey - Freight movement, shipping patterns, logistics data',
+        'cir': 'Current Industrial Reports - Monthly production, shipments, inventories for specific industries',
+        'cjars': 'Criminal Justice Administrative Records System - Criminal justice system data integration',
+        'cog': 'Congressional Oversight Grid - Congressional district boundaries and demographics',
+        'commuting': 'Commuting/Transportation - Journey to work, transportation mode data',
+        'cos': 'Census of Governments - Comprehensive data on state/local governments every 5 years',
+        'cprs': 'Census Planning and Research Survey - Survey methodology and research data',
+        'dcdl': 'Data Collaboration and Development Lab - Experimental data products and research',
+        'dec': 'Demographic and Economic Data - Historical demographic and economic indicators',
+        'demo': 'Demographic Surveys - Population composition, distribution, and change data',
+        'e-stats': 'E-Statistics - Electronic commerce, digital economy data',
+        'econ': 'Economic Indicators - Various economic statistics and indicators',
+        'esp': 'Employment Situation Press release - Monthly employment, unemployment data',
+        'fhwar': 'Foreign Holdings of U.S. Agricultural Land - Foreign ownership of U.S. farmland',
+        'geoinfo': 'Geographic Information - Geographic boundaries, maps, spatial data',
+        'gov-finances': 'Government Finances - State/local government revenue, expenditure data',
+        'govs': 'Governments Survey - State and local government organization, finances, employment',
+        'gus': 'Geographic Update System - Geographic area definitions and updates',
+        'hvs': 'Housing Vacancy Survey - Housing vacancy rates, homeownership, rental market data',
+        'icts': 'International Communications and Trade - International communications, information flow',
+        'industry-classification': 'Industry Classification Systems - NAICS, SIC codes and classifications',
+        'm3': 'Manufacturing and Construction - Manufacturing, construction sector data',
+        'm3ufo': 'Manufacturing, Mining, and Construction Utilities - Industrial production utilities data',
+        'mecs': 'Manufacturing Energy Consumption Survey - Energy use in manufacturing sector',
         'meps': 'Medical Expenditure Panel Survey - Healthcare utilization, expenditures, insurance data',
+        'metro-micro': 'Metropolitan/Micropolitan Areas - Urban area definitions, classifications',
+        'mhs': 'Manufacturing and Housing Sector - Combined manufacturing and housing indicators',
+        'mops': 'Manufacturers\' Orders, Shipments, and Inventories - Manufacturing sector performance',
+        'mops-hp': 'Manufacturers\' Orders, Shipments, and Inventories - Historical Panel data',
+        'mtis': 'Manufacturing Trade and Inventories Survey - Manufacturing trade and inventory trends',
+        'nonemployer-statistics': 'Nonemployer Statistics - Self-employed individuals without paid employees',
+        'nrc': 'National Response Center - Incident reporting data for hazardous materials',
+        'nrs': 'National Research Survey - General research and statistical surveys',
         'nsch': 'National Survey of Children\'s Health - Annual survey on children\'s physical/mental health',
+        'nsch-lc': 'National Survey of Children\'s Health - Longitudinal Cohort data',
+        'nshapc': 'National Survey of Homeless Assistance Providers - Homeless services provider data',
+        'nssrn': 'National Sample Survey of Registered Nurses - Nursing workforce demographics',
+        'nychvs': 'New York City Housing and Vacancy Survey - NYC-specific housing market data',
+        'poms': 'Program Operations and Management System - Census program management data',
+        'popproj': 'Population Projections - Future population projections by age, sex, race',
+        'qfr': 'Quarterly Financial Report - Corporate financial performance data',
+        'qpc': 'Quarterly Programs and Costs - Quarterly program cost and participation data',
+        'qspp': 'Quarterly Services and Producer Price - Service sector price indexes',
+        'qtax': 'Quarterly Tax Data - Quarterly tax collections and revenue data',
+        'rdo': 'Research Data Office - Census research data products and services',
+        'retail': 'Retail Trade Survey - Monthly retail sales, inventory data',
+        'rfs': 'Retail and Food Services - Retail sales and food service sector data',
+        'rhfs': 'Retail and Food Services Survey - Monthly retail and food service sales',
+        'sahie': 'Small Area Health Insurance Estimates - Health insurance coverage by county/state',
+        'saipe': 'Small Area Income/Poverty Estimates - School district, county, state income/poverty estimates',
+        'sas': 'Survey of Agricultural Statistics - Agricultural production, economics data',
+        'sbls': 'Small Business Labor Statistics - Small business employment and labor data',
+        'sbo': 'Survey of Business Owners - Business ownership by demographic characteristics',
+        'school-finances': 'School Finances - Public school revenues, expenditures, debt data',
+        'school-pulse-panel': 'School Pulse Panel - Rapid surveys on education impacts',
+        'services': 'Services Surveys - Service sector revenue, employment data',
+        'sgrd': 'State Government Revenue Data - State government revenue sources and amounts',
         'sipp': 'Survey of Income and Program Participation - Longitudinal economic/demographic survey',
+        'sis': 'Survey of Income Security - Income, poverty, and program participation data',
+        'soc': 'Survey of Construction - Residential construction starts, completions, sales',
+        'soma': 'Survey of Market Absorption - Housing market absorption and vacancy data',
+        'special-census': 'Special Census - Local area population updates between decennial censuses',
+        'sq-class': 'Standard Questionnaire Classification - Survey questionnaire classifications',
+        'state': 'State Data Center - State-specific data, programs',
+        'stc': 'Survey of Trade and Construction - Trade and construction sector data',
+        'supplemental-poverty-measure': 'Supplemental Poverty Measure - Alternative poverty measurement',
+        'susb': 'Annual Survey of US Business - Business dynamics, survival, growth statistics',
+        'tables': 'Statistical Tables - Published statistical tables and summaries',
+        'trade': 'International Trade - Export/import statistics, trade balance data',
+        'vip': 'Vehicle Inventory and Use Survey - Vehicle characteristics, usage patterns',
+        'vius': 'Vehicle Inventory and Use Survey - Vehicle fleet composition and usage',
+        'well-being': 'Well-being Survey - Subjective well-being, quality of life indicators',
+        'wholesale': 'Wholesale Trade Survey - Monthly wholesale trade, sales data',
+        'commuting': 'Commuting Patterns - Journey to work, transportation mode data',
+        'metro-micro': 'Metropolitan/Micropolitan Areas - Urban area definitions, classifications',
         'decennial': 'Decennial Census - Complete population count every 10 years',
         'international-programs': 'International Programs - Global demographic data, comparisons',
-        'household-pulse': 'Household Pulse Survey - Rapid experimental surveys on social/economic impacts',
-        'retail': 'Retail Trade Survey - Monthly retail sales, inventory data',
-        'wholesale': 'Wholesale Trade Survey - Monthly wholesale trade, sales data',
-        'manufacturing': 'Manufacturing Surveys - Industrial production, capacity, orders data',
-        'construction': 'Construction Surveys - Building permits, starts, spending data',
-        'services': 'Services Surveys - Service sector revenue, employment data',
-        'trade': 'International Trade - Export/import statistics, trade balance data',
-        'gov-finances': 'Government Finances - State/local government revenue, expenditure data',
-        'education': 'Education Surveys - School enrollment, finances, staffing data',
-        'transportation': 'Transportation Statistics - Freight, passenger, infrastructure data',
-        'agriculture': 'Census of Agriculture - Comprehensive farm, crop, livestock data every 5 years',
-        'commuting': 'Commuting/Transportation - Journey to work, transportation mode data',
-        'metro-micro': 'Metropolitan/Micropolitan Areas - Urban area definitions, classifications',
-        'state': 'State Data Center - State-specific data, programs',
-        'county': 'County Data - County-level statistics, characteristics',
-        'place': 'Place/City Data - Incorporated place, city statistics',
-        'tract': 'Census Tract Data - Small geographic area demographic/economic data',
-        'block-group': 'Block Group Data - Very small geographic area detailed data',
     }
 
 def get_available_surveys():
@@ -124,7 +190,7 @@ def get_survey_datasets(survey_code):
 
 def crawl_and_download(base_url: str, data_dir: Path, survey_code: str, path_parts: list | None = None):
     """
-    Recursively crawl directory structure and download data files.
+    Recursively crawl directory structure and download data files from 2020+ only.
     
     Args:
         base_url (str): Base URL to start crawling
@@ -166,14 +232,27 @@ def crawl_and_download(base_url: str, data_dir: Path, survey_code: str, path_par
         local_subdir = data_dir / Path(*path_parts)
         local_subdir.mkdir(parents=True, exist_ok=True)
     
-    # Download files in current directory
+    # Download files in current directory (2020+ only)
     files_to_download = []
     for filename in downloadable_files:
         file_url = f"{base_url}{filename}"
         save_path = local_subdir / filename
         
+        # Filter for 2020+ files by checking filename or path
         if not save_path.exists():
-            files_to_download.append((file_url, save_path))
+            # Check if filename or path contains year 2020 or later
+            path_with_year = "/".join(path_parts + [filename]) if path_parts else filename
+            year_match = False
+            
+            # Look for years 2020-2029 in filename or path
+            for year in range(2020, 2030):
+                if str(year) in path_with_year:
+                    year_match = True
+                    break
+            
+            # If no year found, still include (might be current/recent data)
+            if year_match or not any(str(year) in path_with_year for year in range(2000, 2020)):
+                files_to_download.append((file_url, save_path))
     
     if files_to_download:
         num_files = len(files_to_download)
@@ -185,10 +264,22 @@ def crawl_and_download(base_url: str, data_dir: Path, survey_code: str, path_par
             if result:
                 print(result)
     
-    # Recursively crawl subdirectories
+    # Recursively crawl subdirectories (2020+ only)
     for subdir in directories:
         subdir_url = f"{base_url}{subdir}/"
         new_path_parts = path_parts + [subdir]
+        
+        # Skip directories with years before 2020
+        subdir_path = "/".join(new_path_parts)
+        skip_old = False
+        for year in range(2000, 2020):
+            if str(year) in subdir_path:
+                skip_old = True
+                break
+        
+        if skip_old:
+            print(f"Skipping pre-2020 directory: {survey_code}/{'/'.join(new_path_parts)}")
+            continue
         
         # Limit depth to prevent infinite crawling
         if len(new_path_parts) > 5:
@@ -258,13 +349,8 @@ if __name__ == "__main__":
             print("No surveys found. The Census website structure may have changed.")
             exit()
         
-        # Focus on major demographic/economic surveys for USA with descriptions
-        priority_surveys = ['acs', 'popest', 'cps', 'saipe', 'cbp', 'economic-census']
-        filtered_surveys = [s for s in available_surveys if s in priority_surveys]
-        
-        # Add other surveys if priority ones don't exist
-        other_surveys = [s for s in available_surveys if s not in priority_surveys]
-        final_surveys = filtered_surveys + other_surveys[:10]  # Limit options
+        # Show all available surveys without limiting options
+        final_surveys = available_surveys
         
         # Create choices with descriptions
         survey_choices = []
