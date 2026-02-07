@@ -74,6 +74,7 @@ class CopernicusETL:
     """Main class for Copernicus Sentinel data ETL operations."""
     
     def __init__(self):
+        self.monthly_quota = 30000  # Processing units per month
         self.username = os.getenv('COPERNICUS_USERNAME')
         self.password = os.getenv('COPERNICUS_PASSWORD')
         self.client_id = os.getenv('COPERNICUS_CLIENT_ID')
@@ -96,6 +97,21 @@ class CopernicusETL:
         self.auth_url = "https://identity.dataspace.copernicus.eu/auth/realms/IDAS/protocol/openid-connect/token"
         self.catalog_url = "https://catalogue.dataspace.copernicus.eu/odata/v1"
         self.odata_url = "https://dataspace.copernicus.eu/odata/v1"
+        
+        # Cost estimation (rough estimates based on typical product sizes)
+        self.unit_costs = {
+            'sentinel-1': 100,      # SAR products typically 1-2GB
+            'sentinel-2': 150,      # Optical products typically 5-8GB
+            'sentinel-3': 200,      # Various sensors, larger products
+            'sentinel-5p': 50,      # Atmospheric data, smaller
+            'sentinel-6': 100,      # Altimetry data
+            'sentinel-1-slc': 120,
+            'sentinel-1-grd': 80,
+            'sentinel-2-l1c': 150,
+            'sentinel-2-l2a': 180,
+            'sentinel-3-l1': 200,
+            'sentinel-3-l2': 220
+        }
     
     def get_access_token(self) -> str:
         """Get or refresh access token for Copernicus API."""
