@@ -156,6 +156,19 @@ class CopernicusETL:
             'sentinel-3-l2': 'Sentinel-3 L2 - Level-2 products'
         }
     
+    def estimate_cost(self, mission: str, num_products: int) -> Dict[str, int | float]:
+        """Estimate processing unit cost for downloading products."""
+        cost_per_product = self.unit_costs.get(mission, 100)  # Default estimate
+        total_cost = cost_per_product * num_products
+        remaining_quota = self.monthly_quota - total_cost
+        
+        return {
+            'cost_per_product': cost_per_product,
+            'total_cost': total_cost,
+            'remaining_quota': remaining_quota,
+            'percentage_used': (total_cost / self.monthly_quota) * 100
+        }
+    
     def search_products(self, mission: str, start_date: str, end_date: str, 
                        bbox: Optional[Tuple[float, float, float, float]] = None,
                        max_results: int = 100) -> List[Dict]:
@@ -297,6 +310,51 @@ class CopernicusETL:
         
         return results
     
+    def suggest_demo_datasets(self) -> List[Dict]:
+        """Suggest curated demo datasets that are cost-effective and impressive."""
+        return [
+            {
+                'name': 'Recent Urban Development - Sentinel-2',
+                'mission': 'sentinel-2-l2a',
+                'start_date': '2024-01-01',
+                'end_date': '2024-12-31',
+                'bbox': (-0.5, 51.3, 0.3, 51.7),  # London area
+                'description': 'High-resolution imagery of London for urban change detection',
+                'estimated_products': 20,
+                'demo_value': 'Excellent for showing vegetation, urban areas, water bodies'
+            },
+            {
+                'name': 'Coastal Monitoring - Sentinel-1',
+                'mission': 'sentinel-1-grd',
+                'start_date': '2024-06-01',
+                'end_date': '2024-08-31',
+                'bbox': (-2.0, 50.5, -1.5, 51.0),  # South coast UK
+                'description': 'SAR imagery showing coastline regardless of weather',
+                'estimated_products': 15,
+                'demo_value': 'All-weather capability, shows sea, land, and wave patterns'
+            },
+            {
+                'name': 'Air Quality Demo - Sentinel-5P',
+                'mission': 'sentinel-5p',
+                'start_date': '2024-03-01',
+                'end_date': '2024-03-31',
+                'bbox': (-1.0, 51.0, 1.0, 52.5),  # Southern England
+                'description': 'Atmospheric pollutants and air quality measurements',
+                'estimated_products': 10,
+                'demo_value': 'Environmental monitoring, NO2, SO2, aerosol data'
+            },
+            {
+                'name': 'Agricultural Monitoring - Sentinel-2 L1C',
+                'mission': 'sentinel-2-l1c',
+                'start_date': '2024-04-01',
+                'end_date': '2024-09-30',
+                'bbox': (-1.5, 52.0, -0.5, 52.8),  # East Anglia farmland
+                'description': 'Growing season monitoring of agricultural areas',
+                'estimated_products': 25,
+                'demo_value': 'Crop health, field boundaries, vegetation indices'
+            }
+        ]
+    
     def get_time_period_selection(self) -> Tuple[str, str]:
         """Interactive time period selection."""
         current_year = datetime.datetime.now().year
@@ -336,40 +394,65 @@ def main():
         # Initialize ETL pipeline
         etl = CopernicusETL()
         
-        # --- Mission Selection ---
-        missions = etl.get_sentinel_missions()
-        mission_choices = [f"{code} - {desc}" for code, desc in missions.items()]
+        # Initialize variables
+        selected_mission: str = ""
+        start_date: str = ""
+        end_date: str = ""
+        bbox: Optional[Tuple[float, float, float, float]] = None
         
-        selected_mission_full = questionary.select(
-            "Select Sentinel mission:",
-            choices=mission_choices
+        # --- Selection Mode ---
+        selection_mode = questionary.select(
+            "How would you like to select data?",
+            choices=[
+                "Use curated demo dataset (recommended for first time)",
+                "Custom selection"
+            ]
         ).ask()
         
-        if not selected_mission_full:
-            print("No mission selected. Exiting.")
-            return
-        
-        selected_mission = selected_mission_full.split(' - ')[0]
-        
-        # --- Time Period Selection ---
-        start_date, end_date = etl.get_time_period_selection()
-        
-        # --- Optional Bounding Box ---
-        use_bbox = questionary.confirm("Do you want to specify a bounding box?").ask()
-        bbox = None
-        
-        if use_bbox:
-            print("Enter bounding box coordinates (WGS84):")
-            min_lon = questionary.text("Min longitude:").ask()
-            min_lat = questionary.text("Min latitude:").ask()
-            max_lon = questionary.text("Max longitude:").ask()
-            max_lat = questionary.text("Max latitude:").ask()
+        if selection_mode == "Use curated demo dataset (recommended for first time)":
+            demo_datasets = etl.suggest_demo_datasets()
+            demo_choices = [f"{i+1}. {ds['name']} - {ds['description']}" for i, ds in enumerate(demo_datasets)]
             
-            try:
-                bbox = (float(min_lon), float(min_lat), float(max_lon), float(max_lat))
-            except ValueError:
-                print("Invalid coordinates. Proceeding without bounding box.")
-                bbox = None
+            selected_demo = questionary.select(
+                "Select a demo dataset:",
+                choices=demo_choices
+            ).ask()
+            
+            demo_index = int(selected_demo.split('.')[0]) - 1
+            selected_dataset = demo_datasets[demo_index]
+            
+            selected_mission = selected_dataset['mission']
+            start_date = selected_dataset['start_date']
+            end_date = selected_dataset['end_date']
+            bbox = selected_dataset['bbox']
+            
+            print(f"\nSelected: {selected_dataset['name']}")
+            print(f"Mission: {selected_mission}")
+            print(f"Period: {start_date} to {end_date}")
+            print(f"Demo value: {selected_dataset['demo_value']}")
+            
+            # Show cost estimate for demo
+            demo_cost = etl.estimate_cost(selected_mission, selected_dataset['estimated_products'])
+            print(f"\nESTIMATED COST: {demo_cost['total_cost']} units ({demo_cost['percentage_used']:.1f}% of quota)")
+            
+            proceed = questionary.confirm("Proceed with this demo dataset?").ask()
+            if not proceed:
+                print("Operation cancelled.")
+                return
+                
+        else:
+            # --- Mission Selection ---
+            missions = etl.get_sentinel_missions()
+            mission_choices = [f"{code} - {desc}" for code, desc in missions.items()]
+            
+            selected_mission_full = questionary.select(
+                "Select Sentinel mission:",
+                choices=mission_choices
+            ).ask()
+            
+        # --- Search Products ---
+        print(f"\nSearching for {selected_mission} products from {start_date} to {end_date}...")
+        products = etl.search_products(selected_mission, start_date, end_date, bbox)
         
         # --- Search Products ---
         print(f"\nSearching for {selected_mission} products from {start_date} to {end_date}...")
@@ -381,6 +464,16 @@ def main():
         
         print(f"Found {len(products)} products")
         
+        # --- Cost Estimation ---
+        cost_estimate = etl.estimate_cost(selected_mission, len(products))
+        print(f"\n{'='*50}")
+        print("COST ESTIMATION:")
+        print(f"Estimated cost per product: {cost_estimate['cost_per_product']} units")
+        print(f"Total cost for all found products: {cost_estimate['total_cost']} units")
+        print(f"This would use {cost_estimate['percentage_used']:.1f}% of your monthly quota")
+        print(f"Remaining quota after download: {cost_estimate['remaining_quota']} units")
+        print(f"{'='*50}")
+        
         # --- Product Selection ---
         max_results = questionary.text(
             "How many products do you want to download? (max 100)",
@@ -391,6 +484,18 @@ def main():
             max_results = min(int(max_results), len(products), 100)
         except ValueError:
             max_results = min(len(products), 10)
+        
+        # Show cost for selected number
+        selected_cost = etl.estimate_cost(selected_mission, max_results)
+        print(f"\nCOST FOR {max_results} PRODUCTS:")
+        print(f"Total cost: {selected_cost['total_cost']} units ({selected_cost['percentage_used']:.1f}% of quota)")
+        
+        if selected_cost['total_cost'] > etl.monthly_quota:
+            print("⚠️  WARNING: This exceeds your monthly quota!")
+            proceed = questionary.confirm("Do you want to proceed anyway?").ask()
+            if not proceed:
+                print("Operation cancelled.")
+                return
         
         selected_products = products[:max_results]
         
