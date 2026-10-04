@@ -1,16 +1,31 @@
 #!/usr/bin/env python3
 """
 Census Boundary Data Processor
-Extracts and normalizes census boundary shapefiles for upload to PostgreSQL database.
+Extracts and normalizes census boundary shapefiles from S3 for upload to PostgreSQL database.
 """
 
 import os
+import io
 import zipfile
 import shapefile
 import json
+import tempfile
+import shutil
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 
+import boto3
+from botocore.config import Config
+from dotenv import load_dotenv
+
+try:
+    import questionary
+except ImportError:
+    print("'questionary' library is required for the interactive prompt.")
+    print("Please install it using: pip install questionary")
+    exit(1)
+
+load_dotenv()
 
 from sqlalchemy import (
     BigInteger, Column, String, Integer, DateTime, Double, Text, func, JSON, 
@@ -137,53 +152,94 @@ def get_boundary_subtype_from_name(NAME, NAMELSAD):
 
 
 class CensusBoundaryProcessor:
-    def __init__(self, data_dir: str, db_connection_string: str):
-        self.data_dir = data_dir
+    def __init__(self, db_connection_string: str, bucket_name: str | None = None):
         self.db_connection_string = db_connection_string
         self.engine = create_engine(db_connection_string)
         self.Session = sessionmaker(bind=self.engine)
+        
+        self.s3_client = boto3.client(
+            's3',
+            endpoint_url=os.getenv('S3_ENDPOINT_URL', 'https://s3.us-east-1.wasabisys.com'),
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1'),
+            config=Config(signature_version='s3v4')
+        )
+        self.bucket_name = bucket_name or os.getenv('S3_BUCKET_NAME', 'geoagent-dev-s3')
+        self.temp_dir = tempfile.mkdtemp(prefix='census_')
+        
+    def __del__(self):
+        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
         
     def create_tables(self):
         """Create database tables if they don't exist."""
         Base.metadata.create_all(self.engine)
         print("Database tables created successfully")
         
-    def get_census_files(self, year: int) -> List[str]:
-        """Get list of census zip files for a given year."""
-        year_dir = os.path.join(self.data_dir, str(year))
-        if not os.path.exists(year_dir):
-            raise FileNotFoundError(f"Directory {year_dir} not found")
-        
-        files = []
-        for file in os.listdir(year_dir):
-            if file.endswith('.zip'):
-                files.append(os.path.join(year_dir, file))
-        return sorted(files)
+    def list_s3_files(self, prefix: str = 'origin/census/') -> List[Dict]:
+        """List all shapefile zips in S3 bucket."""
+        try:
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            objects = []
+            
+            for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                for obj in page.get('Contents', []):
+                    if obj['Key'].endswith('.zip'):
+                        objects.append({
+                            'key': obj['Key'],
+                            'size': obj['Size'],
+                            'last_modified': obj['LastModified']
+                        })
+            
+            return sorted(objects, key=lambda x: x['key'])
+        except Exception as e:
+            print(f"Error listing S3 objects: {e}")
+            return []
     
-    def extract_shapefile(self, zip_path: str, extract_dir: str) -> str:
-        """Extract shapefile from zip and return the path to .shp file."""
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    def get_census_files(self, year: int | None = None) -> List[Dict]:
+        """Get list of census zip files from S3, optionally filtered by year."""
+        all_files = self.list_s3_files('origin/census/')
+        
+        if year:
+            year_prefix = f'tl_{year}_'
+            all_files = [f for f in all_files if year_prefix in f['key']]
+        
+        return all_files
+    
+    def download_zip_from_s3(self, s3_key: str) -> bytes:
+        """Download zip file content from S3."""
+        try:
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=s3_key)
+            return response['Body'].read()
+        except Exception as e:
+            print(f"Error downloading {s3_key}: {e}")
+            raise
+    
+    def extract_shapefile(self, zip_content: bytes, extract_dir: str) -> str:
+        """Extract shapefile from zip bytes and return the path to .shp file."""
+        with zipfile.ZipFile(io.BytesIO(zip_content), 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
         
-        # Find the .shp file
         for file in os.listdir(extract_dir):
             if file.endswith('.shp'):
                 return os.path.join(extract_dir, file)
         
-        raise FileNotFoundError(f"No .shp file found in {zip_path}")
+        raise FileNotFoundError(f"No .shp file found in zip")
     
-    def parse_filename(self, filename: str) -> Dict[str, str]:
+    def parse_filename(self, s3_key: str) -> Dict[str, str]:
         """Parse census filename to extract metadata."""
-        # Example: tl_2020_01_place.zip -> year=2020, statefp=01, layer=place
-        parts = os.path.basename(filename).replace('.zip', '').split('_')
+        filename = os.path.basename(s3_key)
+        parts = filename.replace('.zip', '').split('_')
         if len(parts) >= 4:
             return {
                 'year': parts[1],
                 'statefp': parts[2],
                 'layer': parts[3],
-                'full_filename': os.path.basename(filename)
+                'full_filename': filename,
+                's3_key': s3_key
             }
-        return {}
+        return {'s3_key': s3_key, 'full_filename': filename}
     
     def normalize_record(self, record: Tuple, fields: List, metadata: Dict, geometry) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Normalize shapefile record to match database schema."""
@@ -442,66 +498,91 @@ class CensusBoundaryProcessor:
         print(f"Attributes: {attribute_inserted} inserted, {attribute_skipped} skipped (duplicates), {attribute_errors} errors")
     
     def process_year(self, year: int, boundary_types: List[str] | None = None):
-        """Process all census files for a given year."""
+        """Process all census files for a given year from S3."""
         if boundary_types is None:
             boundary_types = ['place', 'tract', 'county', 'state', 'zcta520']
         
         files = self.get_census_files(year)
         print(f"Found {len(files)} files for {year}")
         
-        # Filter by boundary types
-        filtered_files = [f for f in files if any(bt in f for bt in boundary_types)]
+        filtered_files = [f for f in files if any(bt in f['key'] for bt in boundary_types)]
         print(f"Processing {len(filtered_files)} boundary files")
         
         total_records = 0
-        temp_dir = f"/tmp/census_{year}"
-        os.makedirs(temp_dir, exist_ok=True)
         
-        for file_path in filtered_files:
-            metadata = self.parse_filename(file_path)
-            if not metadata:
+        for file_info in filtered_files:
+            s3_key = file_info['key']
+            metadata = self.parse_filename(s3_key)
+            if not metadata or 'layer' not in metadata:
                 continue
             
-            print(f"\nProcessing {metadata['layer']} for state {metadata['statefp']}")
+            print(f"\nProcessing {metadata['layer']} for state {metadata.get('statefp', 'unknown')}")
             
             try:
-                # Extract shapefile
-                extract_dir = os.path.join(temp_dir, f"extract_{metadata['statefp']}_{metadata['layer']}")
+                extract_dir = os.path.join(self.temp_dir, f"extract_{metadata.get('statefp', 'xx')}_{metadata['layer']}")
                 os.makedirs(extract_dir, exist_ok=True)
                 
-                shp_path = self.extract_shapefile(file_path, extract_dir)
+                zip_content = self.download_zip_from_s3(s3_key)
+                shp_path = self.extract_shapefile(zip_content, extract_dir)
                 
-                # Process shapefile
                 records = self.process_shapefile(shp_path, metadata)
                 
-                # Load to database
                 if records:
                     self.load_to_database(records)
                     total_records += len(records)
                 
-                # Clean up
-                import shutil
                 shutil.rmtree(extract_dir)
                 
             except Exception as e:
-                print(f"Error processing {file_path}: {e}")
+                print(f"Error processing {s3_key}: {e}")
                 continue
-        
-        # Clean up temp directory
-        import shutil
-        shutil.rmtree(temp_dir)
         
         print(f"\nCompleted {year}: {total_records} total records processed")
     
     def run(self, years: List[int] | None = None, boundary_types: List[str] | None = None):
-        """Main execution method."""
+        """Main execution method with TUI prompts."""
+        print("\n1. Connecting to S3 and listing available files...")
+        
+        all_files = self.list_s3_files('origin/census/')
+        print(f"   Found {len(all_files)} shapefile zips in origin/census/")
+        
+        available_years = set()
+        available_types = set()
+        
+        for f in all_files:
+            metadata = self.parse_filename(f['key'])
+            if 'year' in metadata:
+                available_years.add(int(metadata['year']))
+            if 'layer' in metadata:
+                available_types.add(metadata['layer'])
+        
+        available_years = sorted(available_years, reverse=True)
+        available_types = sorted(available_types)
+        
+        print(f"   Available years: {available_years}")
+        print(f"   Available boundary types: {available_types}")
+        
         if years is None:
-            years = list(range(2010,2026))
+            year_choices = [str(y) for y in available_years]
+            selected_years_str = questionary.checkbox(
+                "Select years to process:",
+                choices=year_choices
+            ).ask()
+            years = [int(y) for y in selected_years_str] if selected_years_str else []
         
         if boundary_types is None:
-            boundary_types = ['place', 'tract', 'county', 'state']
+            boundary_type_choices = questionary.checkbox(
+                "Select boundary types to process:",
+                choices=available_types
+            ).ask()
+            boundary_types = boundary_type_choices if boundary_type_choices else ['place', 'tract', 'county']
         
-
+        if not years:
+            print("No years selected. Exiting.")
+            return
+        
+        print(f"\nProcessing years: {years}")
+        print(f"Boundary types: {boundary_types}")
         
         for year in years:
             print(f"\n{'='*50}")
@@ -511,29 +592,19 @@ class CensusBoundaryProcessor:
 
 
 def main():
-    # Configuration
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
-    data_dir = "/home/jovyan/data/census"
 
-    # Database connection using environment variables
     db_host = os.getenv('POSTGRES_HOST', 'localhost')
     db_connection_string = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{db_host}:5432/{os.getenv('POSTGRES_DB')}"
     
-    # Create processor and run
-    processor = CensusBoundaryProcessor(data_dir, db_connection_string)
+    processor = CensusBoundaryProcessor(db_connection_string)
     
-    # Create database tables first
     processor.create_tables()
-    
-    # Process both 2020 and 2025 data for place, tract, and county boundaries
-    # processor.run(years=list(range(2010,2026)), boundary_types=['place', 'tract', 'county', 'state'])
-    # processor.run(years=list(range(2010,2026)), boundary_types=['zcta520', 'cbsa', 'cd'])
-    # processor.run(years=list(range(2010,2026)), boundary_types=['arealm', 'bg'])
-    processor.run(years=list(range(2010,2026)), boundary_types=['sldl', 'sldu'])
+    processor.run()
 
     
 
