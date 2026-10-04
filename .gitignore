@@ -5,6 +5,8 @@
 data/*/*.json
 data/**/*.csv
 data/**/*.zip
+data/geoagent-dev-s3/origin/census/**/*.zip
+data/geoagent-dev-s3/origin/census_surveys/**
 data/**/*.geojson
 data/**/*.sql
 data/**/usa_census_cd/*
