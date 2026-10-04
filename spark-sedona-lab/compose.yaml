@@ -1,0 +1,18 @@
+services:
+  sedona:
+    image: apache/sedona:latest
+    container_name: sedona-interview-lab
+    restart: unless-stopped
+    ports:
+      - "8888:8888"   # Jupyter
+      - "8085:8085"   # Sedona image service/UI when available
+      - "4040:4040"   # Spark application UI while a job is running
+    environment:
+      DRIVER_MEM: 4g
+      EXECUTOR_MEM: 4g
+    volumes:
+      - ./jobs:/opt/sedona-lab/jobs
+      - ./data:/opt/sedona-lab/data
+      - ./output:/opt/sedona-lab/output
+    stdin_open: true
+    tty: true
