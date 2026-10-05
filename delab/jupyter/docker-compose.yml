@@ -18,16 +18,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: ${POSTGRES_HOST:-host.docker.internal}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5434}
       POSTGRES_SSL_MODE: ${POSTGRES_SSL_MODE:-require}
       POSTGRES_SSL_CERT: ${POSTGRES_SSL_CERT:-}
       POSTGRES_SSL_KEY: ${POSTGRES_SSL_KEY:-}
       POSTGRES_SSL_CA: ${POSTGRES_SSL_CA:-}
     volumes:
       - ${JUPYTER_WORKDIR:-./workspace}:/home/jovyan/work
-      - /home/brandon/dev/blcrosbie/GeoDataAnalytics/data:/home/jovyan/data
+      - ${DATA_DIR:-../../data}:/home/jovyan/data
       - ./requirements.txt:/home/jovyan/requirements.txt
-      - /home/brandon/dev/blcrosbie/GeoDataAnalytics/scripts:/home/jovyan/scripts
+      - ../../scripts:/home/jovyan/scripts
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     shm_size: "2gb"
     command: >
       bash -c "pip install -r /home/jovyan/requirements.txt && 

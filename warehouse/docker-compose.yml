@@ -1,0 +1,31 @@
+services:
+  warehouse:
+    build:
+      context: ./docker
+    image: geo-warehouse:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geodata}
+      POSTGRES_USER: ${POSTGRES_USER:-geoadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in warehouse/.env}
+      LAKE_S3_KEY_ID: ${LAKE_S3_KEY_ID:-}
+      LAKE_S3_SECRET: ${LAKE_S3_SECRET:-}
+      LAKE_S3_REGION: ${LAKE_S3_REGION:-us-east-1}
+      LAKE_S3_ENDPOINT: ${LAKE_S3_ENDPOINT:-s3.us-east-1.wasabisys.com}
+      LAKE_BUCKET: ${LAKE_BUCKET:-}
+    # DuckDB's working memory lives inside the Postgres backend; keep it bounded.
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_duckdb
+      -c duckdb.max_memory=${DUCKDB_MAX_MEMORY:-4GB}
+      -c duckdb.threads=${DUCKDB_THREADS:-4}
+      -c duckdb.postgres_role=geo_reader
+    ports:
+      # Localhost by default. Set WAREHOUSE_BIND=0.0.0.0 (with TLS + firewall) to serve other hosts.
+      - "${WAREHOUSE_BIND:-127.0.0.1}:${WAREHOUSE_PORT:-5434}:5432"
+    volumes:
+      - warehouse_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  warehouse_data:

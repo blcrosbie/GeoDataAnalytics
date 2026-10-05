@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: geodata_analytics_dev
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "5433:5432"
@@ -40,7 +40,7 @@ services:
     container_name: geodata_minio_dev
     environment:
       MINIO_ROOT_USER: devadmin
-      MINIO_ROOT_PASSWORD: devadmin123
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-devadmin123}
     ports:
       - "9002:9000"
       - "9003:9001"
@@ -56,7 +56,7 @@ services:
     container_name: geodata_pgadmin_dev
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@geodata.dev
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "5050:80"
@@ -74,7 +74,7 @@ services:
     container_name: geodata_jupyter_dev
     environment:
       JUPYTER_ENABLE_LAB: "yes"
-      JUPYTER_TOKEN: "devgeodata"
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-devgeodata}
     ports:
       - "8889:8888"
     volumes:

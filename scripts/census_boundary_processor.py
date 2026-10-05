@@ -40,6 +40,9 @@ from geoalchemy2.shape import to_shape, from_shape
 from sqlalchemy.exc import DataError
 from tqdm import tqdm     # optional progress bar
 
+# TIGER ID columns in priority order; layers/vintages name it differently.
+GEOID_FIELDS = ('GEOID', 'GEOID20', 'GEOID10', 'GEOIDFQ', 'AREAID', 'ZCTA5CE20', 'ZCTA5CE10')
+
 class Base(DeclarativeBase):
     pass
 
@@ -249,7 +252,12 @@ class CensusBoundaryProcessor:
             field_dict[field[0]] = record[i]
         
         # Extract basic info
-        geoid = field_dict.get('GEOID', '')
+        # The ID column name varies by layer/vintage (ZCTA520 -> GEOID20, AREALM -> AREAID).
+        # Falling back to '' made every feature in such a layer upsert onto one empty-geoid row.
+        geoid = next((str(field_dict[k]).strip() for k in GEOID_FIELDS
+                      if str(field_dict.get(k) or '').strip()), '')
+        if not geoid:
+            return None, []
         year = int(metadata['year'])
         name = field_dict.get('NAME', '')
         boundary_type = metadata['layer'].upper()  # Derived from filename
@@ -335,6 +343,7 @@ class CensusBoundaryProcessor:
             # Open shapefile with explicit encoding to handle non-UTF8 characters
             sf = shapefile.Reader(shp_path, encoding='latin-1')
             normalized_records = []
+            skipped_no_geoid = 0
             
             print(f"Processing {shp_path}: {len(sf)} records")
             
@@ -362,6 +371,9 @@ class CensusBoundaryProcessor:
                         record = tuple(record)
                     
                     boundary_record, attribute_records = self.normalize_record(record, sf.fields, metadata, geometry)
+                    if boundary_record is None:
+                        skipped_no_geoid += 1
+                        continue
                     normalized_records.append((boundary_record, attribute_records))
                     
                 except Exception as e:
@@ -369,6 +381,8 @@ class CensusBoundaryProcessor:
                     continue
             
             sf.close()
+            if skipped_no_geoid:
+                print(f"Skipped {skipped_no_geoid} records with no ID column ({', '.join(GEOID_FIELDS)})")
             return normalized_records
             
         except Exception as e:

@@ -8,7 +8,7 @@
 
 """
 
-__author__ = 'jamwamb7@gmail.com'
+__author__ = 'blcrosbie@users.noreply.github.com'
 __date__ = '2020-07-21'
 __copyright__ = 'Copyright 2020, Brandon Crosbie'
 

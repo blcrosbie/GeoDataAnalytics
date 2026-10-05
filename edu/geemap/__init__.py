@@ -8,7 +8,7 @@
                              -------------------
         begin                : 2020-07-21
         copyright            : (C) 2020 by Brandon Crosbie
-        email                : jamwamb7@gmail.com
+        email                : blcrosbie@users.noreply.github.com
         git sha              : $Format:%H$
  ***************************************************************************/
 
