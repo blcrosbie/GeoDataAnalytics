@@ -1,5 +1,8 @@
 # Database Transfer Script
 
+> The schema these tables use lives in [`../warehouse/init-db`](../warehouse/init-db). Run the target
+> database from `warehouse/` (or `delab/postgis/` for a lab copy).
+
 This script transfers data from a source PostgreSQL database to a target PostgreSQL database for the GeoDataAnalytics project.
 
 ## Setup

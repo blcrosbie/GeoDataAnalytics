@@ -8,7 +8,7 @@ qgisMinimumVersion=3.0
 description=This plugin provides a GUI interface for Google Earth Engine and Python using the geemap module
 version=0.1
 author=Brandon Crosbie
-email=jamwamb7@gmail.com
+email=blcrosbie@users.noreply.github.com
 
 about=This plugin provides a GUI interface for Google Earth Engine and Python using the geemap module
 

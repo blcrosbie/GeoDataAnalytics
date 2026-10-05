@@ -1,6 +1,7 @@
 # memory
 .DS_Store
-*/__pycache__/
+**/__pycache__/
+*.pyc
 .ipynb_checkpoints/
 data/*/*.json
 data/**/*.csv
@@ -38,5 +39,16 @@ delab/**/certbot/
 
 
 # virtual envs
+.venv/
+**/.venv/
 transfer/.transfer
 utils/.utils
+
+# spark-sedona-lab outputs
+spark-sedona-lab/output/
+spark-sedona-lab/data/
+
+# raw data lives in Wasabi (origin/); use the rclone mount or s3:// paths
+data/irs/
+data/natural_earth/
+data/geoagent-dev-s3/

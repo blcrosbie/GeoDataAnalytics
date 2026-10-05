@@ -5,7 +5,7 @@ based on Docker Compose. Use the .env.example files as templates and keep real
 secrets in .env files (which are gitignored).
 
 Layout
-- postgis: Local PostGIS stack similar to root docker-compose.yml
+- postgis: Lab copy of the central warehouse (PG17 + PostGIS + h3 + pg_duckdb, schema from ../warehouse/init-db). The shared instance lives in ../warehouse/.
 - jupyter: JupyterLab stack sized for a Hetzner server
 - mcp-servers: Place MCP server configs and env templates here
 - proxy: Nginx + Certbot HTTPS reverse proxy
