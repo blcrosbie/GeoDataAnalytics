@@ -25,11 +25,14 @@ can, because Wasabi speaks the S3 API and charges no egress.
 |---|---|
 | `docker/Dockerfile` | `pgduckdb/pgduckdb:17-v1.1.1` + PostGIS + h3 |
 | `docker-compose.yml` | The service (port `5434`, DuckDB memory/threads capped) |
-| `init-db/00-05` | Schema: extensions and roles, `borders`/`hexes`, `geographic_boundaries`, partitioned EAV `geographic_data` |
+| `init-db/00-05b` | Schema: extensions and roles, `borders`/`hexes`, `geographic_boundaries`, partitioned EAV `geographic_data`, `boundary_crosswalk` |
 | `init-db/06-pg-duckdb.sh` | Enables pg_duckdb and registers the Wasabi secret from env |
 | `init-db/07-lake-views.sh` | `lake.boundaries` / `lake.attributes` views over the curated Parquet |
 | `migrations/` | Non-destructive migrations for an existing DB |
 | `export/export_geoparquet.py` | Postgres → GeoParquet in S3 exporter (resumable, verifiable) |
+| `load/load_tiger_boundaries.py` | TIGER/Line zips → `geographic_boundaries`, one vintage, layer by layer |
+| `load/load_acs_summary_file.py` | ACS 5-year table-based Summary File → lake Parquet (all tables) and `geographic_data` (core tables) |
+| `load/build_crosswalk.sql` | Shape-overlap crosswalk between two boundary vintages |
 
 ## Run it
 
@@ -54,11 +57,57 @@ CREATE ROLE notebook_ro LOGIN PASSWORD '...' IN ROLE geo_reader;
 The Wasabi key is exposed to every `geo_reader` member through a PUBLIC user
 mapping (that's how pg_duckdb shares one secret), so it **must be a read-only key**.
 
+## Loading Census data
+
+Geographies are keyed `(summary_level, geoid, year)`. A geoid alone is
+ambiguous: county `01001`, SLDU `01001` and ZCTA `01001` are different places.
+
+```bash
+export WAREHOUSE_DSN="host=localhost port=5434 dbname=geodata user=geoadmin password=..."
+# 1. boundaries for the vintage (state, county, cbsa, tract, bg, cd, sldu, sldl)
+python load/load_tiger_boundaries.py --year 2024
+# 2. ACS 5-year: core tables into Postgres, every table into the lake
+python load/load_acs_summary_file.py --year 2024 core
+python load/load_acs_summary_file.py --year 2024 lake --staging /big/disk/tmp
+# 3. crosswalk each older vintage onto the newest one, per level
+psql "$WAREHOUSE_DSN" -v level=140 -v from_year=2022 -v to_year=2024 -f load/build_crosswalk.sql
+```
+
+Sources are read in place from the Wasabi rclone mount at
+`data/geoagent-dev-s3/origin/` (pass `--root` for another mirror).
+
+ACS values are keyed `acs:<table>_e<line>` (estimates only in Postgres) and
+labelled in `attribute_catalog`. Postgres holds the core tables (`CORE_TABLES`
+in the loader) at state, county, tract, block group, CBSA, congressional and
+state-legislative levels. Every table, every geography, with MOEs and
+Census annotation sentinels kept raw (-666666666 etc.), is in
+`curated/acs/vintage=<Y>/table=<id>/part-0.parquet`.
+
+### Trends across changing boundaries
+
+GEOIDs change: tracts and block groups are renumbered every decennial census,
+districts are redrawn, and Connecticut swapped counties for planning regions
+in 2022. `boundary_crosswalk` links two vintages by shape overlap
+(`from_share`, `to_share`, and `relation` = same / split / merge / partial).
+`attribute_on_geography()` re-expresses any year onto a target year's shapes:
+
+```sql
+-- total population (additive) for every year, on 2024 tracts
+SELECT * FROM attribute_on_geography('acs:b01003_e001', '140', 2024);
+-- median household income (not additive): dominant overlapping tract's value
+SELECT * FROM attribute_on_geography('acs:b19013_e001', '140', 2024, false);
+```
+
+Counts are apportioned by area, which assumes people are spread evenly within
+a shape. ACS dollar values are in each vintage's own inflation-adjusted
+dollars, so adjust by CPI before comparing them across years.
+
 ## Lake layout (`s3://<bucket>/curated/`)
 
 ```
 boundaries/boundary_type=<STATE|COUNTY|TRACT|BG|...>/year=<YYYY>/part-0.parquet   GeoParquet, EPSG:4326
 attributes/boundary_type=<...>/year=<YYYY>/part-0.parquet                       EAV facts joined to boundary type
+acs/vintage=<YYYY>/table=<b19013|...>/part-0.parquet                             ACS 5-year, one wide file per table
 ```
 
 Boundary files carry scalar spatial keys next to the geometry: `h3_r5` and

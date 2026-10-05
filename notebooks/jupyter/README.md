@@ -1,5 +1,13 @@
-JupyterLab (Hetzner)
+# JupyterLab (local)
 
-1) Copy .env.example to .env and set a strong JUPYTER_TOKEN.
-2) Run: docker compose up -d
-3) Open http://<server-ip>:${JUPYTER_PORT}${JUPYTER_BASE_URL}
+Local JupyterLab with `../../data` and `../../scripts` mounted. It connects to the
+warehouse on the host (`:5434`) through `host.docker.internal`.
+
+```bash
+cp .env.example .env      # set JUPYTER_TOKEN and warehouse credentials (a geo_reader login)
+docker compose up -d
+```
+
+Open <http://127.0.0.1:8888/>. The port binds to localhost only. If you run this
+on a remote box, tunnel to it instead of exposing it:
+`ssh -L 8888:127.0.0.1:8888 <host>`.

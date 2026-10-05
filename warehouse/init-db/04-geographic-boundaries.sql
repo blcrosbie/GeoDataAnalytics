@@ -2,7 +2,8 @@ BEGIN;
 
 -- ============================================================================
 -- geographic_boundaries : master spatial catalog (entity table)
---   PK (geoid, year) is the join target for the geographic_data EAV facts.
+--   PK (summary_level, geoid, year) is the join target for the geographic_data
+--   EAV facts. geoid alone is ambiguous: county/SLDU/SLDL/ZCTA all use 01001.
 --   Boundary geometry for ArcGIS Pro is served from here (and crosstab MVs).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.geographic_boundaries (
@@ -13,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.geographic_boundaries (
     boundary_type       VARCHAR(64)  NOT NULL,
     boundary_subtype    VARCHAR(64),
     country             VARCHAR(3),
-    summary_level       VARCHAR(3),              -- 010 nation / 040 state / 050 county / 140 tract ...
+    summary_level       VARCHAR(3)   NOT NULL,   -- 010 nation / 040 state / 050 county / 140 tract ...
     source              VARCHAR(255),
     accuracy_meters     NUMERIC(10,2),
     validity_start_date DATE,
@@ -22,8 +23,14 @@ CREATE TABLE IF NOT EXISTS public.geographic_boundaries (
     source_upload_id    UUID,
     last_updated        TIMESTAMPTZ  DEFAULT now(),
     created_at          TIMESTAMPTZ  DEFAULT now(),
+    -- TIGER/Line shape attributes
+    aland               BIGINT,                  -- land area, m²
+    awater              BIGINT,                  -- water area, m²
+    internal_point      geometry(POINT, 4326),   -- INTPTLAT/INTPTLON
+    mtfcc               VARCHAR(5),
+    funcstat            VARCHAR(1),
 
-    PRIMARY KEY (geoid, year)
+    PRIMARY KEY (summary_level, geoid, year)
 );
 
 -- Spatial draw index for ArcGIS / PostGIS map queries.

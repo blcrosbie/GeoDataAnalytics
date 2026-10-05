@@ -10,7 +10,7 @@ partitioned public.geographic_data table via:
 
     stream -> COPY into UNLOGGED staging -> set-based UPSERT (validate-join)
 
-Cells whose (geoid, year) has no boundary yet are diverted to
+Cells whose (summary_level, geoid, year) has no boundary yet are diverted to
 public.geographic_data_unmatched and replayed later by `replay-unmatched`.
 
 Usage
@@ -259,15 +259,16 @@ class CensusIngestPipeline:
     _MERGE_SQL = """
         WITH deduped AS (
             -- collapse duplicate cells within this batch (last write wins)
-            SELECT DISTINCT ON (source_survey, year, geoid, attribute_key) *
+            SELECT DISTINCT ON (source_survey, year, summary_level, geoid, attribute_key) *
             FROM _stg_geographic_data
-            ORDER BY source_survey, year, geoid, attribute_key, ctid DESC
+            ORDER BY source_survey, year, summary_level, geoid, attribute_key, ctid DESC
         ),
         validated AS (
             SELECT d.*, (b.geoid IS NOT NULL) AS has_boundary
             FROM   deduped d
             LEFT   JOIN public.geographic_boundaries b
-                   ON b.geoid = d.geoid AND b.year = d.year
+                   ON b.summary_level = d.summary_level AND b.geoid = d.geoid
+                  AND b.year = d.year
         ),
         ins_main AS (
             INSERT INTO public.geographic_data
@@ -276,7 +277,7 @@ class CensusIngestPipeline:
             SELECT geoid, year, source_survey, summary_level, attribute_key,
                    attribute_value, numeric_value, data_type, source, collection_date
             FROM   validated WHERE has_boundary
-            ON CONFLICT (source_survey, year, geoid, attribute_key) DO UPDATE
+            ON CONFLICT (source_survey, year, summary_level, geoid, attribute_key) DO UPDATE
                 SET attribute_value = EXCLUDED.attribute_value,
                     numeric_value   = EXCLUDED.numeric_value,
                     data_type       = EXCLUDED.data_type,
@@ -290,7 +291,7 @@ class CensusIngestPipeline:
             SELECT geoid, year, source_survey, summary_level, attribute_key,
                    attribute_value, numeric_value, data_type, source, collection_date
             FROM   validated WHERE NOT has_boundary
-            ON CONFLICT (source_survey, year, geoid, attribute_key) DO NOTHING
+            ON CONFLICT (source_survey, year, summary_level, geoid, attribute_key) DO NOTHING
             RETURNING 1
         )
         SELECT (SELECT count(*) FROM ins_main),
@@ -377,7 +378,8 @@ class CensusIngestPipeline:
             WITH promotable AS (
                 DELETE FROM public.geographic_data_unmatched u
                 USING public.geographic_boundaries b
-                WHERE b.geoid = u.geoid AND b.year = u.year
+                WHERE b.summary_level = u.summary_level AND b.geoid = u.geoid
+                  AND b.year = u.year
                 RETURNING u.geoid, u.year, u.source_survey, u.summary_level,
                           u.attribute_key, u.attribute_value, u.numeric_value,
                           u.data_type, u.source, u.collection_date
@@ -386,7 +388,7 @@ class CensusIngestPipeline:
                 (geoid, year, source_survey, summary_level, attribute_key,
                  attribute_value, numeric_value, data_type, source, collection_date)
             SELECT * FROM promotable
-            ON CONFLICT (source_survey, year, geoid, attribute_key) DO NOTHING;
+            ON CONFLICT (source_survey, year, summary_level, geoid, attribute_key) DO NOTHING;
         """
         conn = psycopg2.connect(self.dsn)
         try:
