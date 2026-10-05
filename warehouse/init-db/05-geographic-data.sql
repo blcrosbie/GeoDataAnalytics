@@ -6,7 +6,7 @@ BEGIN;
 --   Partition columns (source_survey, year) MUST appear in every unique
 --   constraint, hence the wide PK below.
 --
---   The boundary relationship to geographic_boundaries(geoid, year) is enforced
+--   The boundary relationship to geographic_boundaries(summary_level, geoid, year) is enforced
 --   LOGICALLY by the ingest pipeline (stage -> validate-join -> unmatched sink),
 --   NOT by a physical FK, so bulk COPY is not throttled by per-row triggers.
 -- ============================================================================
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.geographic_data (
     summary_level    VARCHAR(3)    NOT NULL,        -- 040/050/140 ... for cheap level filters
     attribute_key    VARCHAR(128)  NOT NULL,        -- '<survey>:<var>[@dim=val;...]'
     attribute_value  TEXT,
-    numeric_value    NUMERIC(20,8),
+    numeric_value    NUMERIC(24,8),
     data_type        VARCHAR(32)   NOT NULL DEFAULT 'text',
     source           VARCHAR(128),
     collection_date  DATE,
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS public.geographic_data (
     created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (source_survey, year, geoid, attribute_key, id),
-    CONSTRAINT uq_geo_cell UNIQUE (source_survey, year, geoid, attribute_key)
+    PRIMARY KEY (source_survey, year, summary_level, geoid, attribute_key, id),
+    CONSTRAINT uq_geo_cell UNIQUE (source_survey, year, summary_level, geoid, attribute_key)
 ) PARTITION BY LIST (source_survey);
 
 -- ---- Level-1: one LIST partition per survey, each RANGE-partitioned by year --
@@ -100,12 +100,12 @@ CREATE TABLE IF NOT EXISTS public.geographic_data_unmatched (
     summary_level    VARCHAR(3)    NOT NULL,
     attribute_key    VARCHAR(128)  NOT NULL,
     attribute_value  TEXT,
-    numeric_value    NUMERIC(20,8),
+    numeric_value    NUMERIC(24,8),
     data_type        VARCHAR(32)   NOT NULL DEFAULT 'text',
     source           VARCHAR(128),
     collection_date  DATE,
     logged_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
-    CONSTRAINT uq_unmatched_cell UNIQUE (source_survey, year, geoid, attribute_key)
+    CONSTRAINT uq_unmatched_cell UNIQUE (source_survey, year, summary_level, geoid, attribute_key)
 );
 CREATE INDEX IF NOT EXISTS idx_gd_unmatched_geo_year
     ON public.geographic_data_unmatched (geoid, year);

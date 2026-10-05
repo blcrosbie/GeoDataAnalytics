@@ -32,10 +32,10 @@ geo_env/
 .env.secret
 secrets/*
 
-# delab
-delab/**/data/
-delab/**/workspace/
-delab/**/certbot/
+# notebooks lab
+notebooks/scratch/
+notebooks/**/data/
+notebooks/**/workspace/
 
 
 # virtual envs
@@ -52,3 +52,6 @@ spark-sedona-lab/data/
 data/irs/
 data/natural_earth/
 data/geoagent-dev-s3/
+
+# warehouse TLS material
+warehouse/certs/

@@ -2,8 +2,9 @@ services:
   jupyter:
     image: jupyter/datascience-notebook:latest
     restart: unless-stopped
+    # Local-only. Not meant to be hosted; reach it over an SSH tunnel if it runs on a server.
     ports:
-      - "${JUPYTER_PORT:-8888}:8888"
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
     environment:
       JUPYTER_ENABLE_LAB: "yes"
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-changeme}
@@ -20,7 +21,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: ${POSTGRES_HOST:-host.docker.internal}
       POSTGRES_PORT: ${POSTGRES_PORT:-5434}
-      POSTGRES_SSL_MODE: ${POSTGRES_SSL_MODE:-require}
+      POSTGRES_SSL_MODE: ${POSTGRES_SSL_MODE:-prefer}
       POSTGRES_SSL_CERT: ${POSTGRES_SSL_CERT:-}
       POSTGRES_SSL_KEY: ${POSTGRES_SSL_KEY:-}
       POSTGRES_SSL_CA: ${POSTGRES_SSL_CA:-}
@@ -36,14 +37,5 @@ services:
       bash -c "pip install -r /home/jovyan/requirements.txt && 
       start-notebook.py
       --ServerApp.root_dir=/home/jovyan
-      --ServerApp.allow_remote_access=True
       --ServerApp.ip=0.0.0.0
-      --ServerApp.port=8888
-      --ServerApp.base_url=${JUPYTER_BASE_URL:-/}"
-    networks:
-      - delab
-
-networks:
-  delab:
-    name: delab
-    external: true
+      --ServerApp.port=8888"

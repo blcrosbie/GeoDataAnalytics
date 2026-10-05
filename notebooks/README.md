@@ -1,34 +1,20 @@
-Data Engineering Lab
+# notebooks/ (data lab)
 
-This folder contains reproducible local and server-side data engineering setups
-based on Docker Compose. Use the .env.example files as templates and keep real
-secrets in .env files (which are gitignored).
+Scratch space for exploring new data after a fetch: notebooks, plus the Docker
+stacks to run them locally against the warehouse.
 
-Layout
-- postgis: Lab copy of the central warehouse (PG17 + PostGIS + h3 + pg_duckdb, schema from ../warehouse/init-db). The shared instance lives in ../warehouse/.
-- jupyter: JupyterLab stack sized for a Hetzner server
-- mcp-servers: Place MCP server configs and env templates here
-- proxy: Nginx + Certbot HTTPS reverse proxy
+| Path | What |
+|---|---|
+| `*.ipynb` | H3 explorations: census and world borders mapped to hex grids (`Relate Borders to H3`, `World Borders Admin 0 to H3`) |
+| `jupyter/` | Local JupyterLab (127.0.0.1 only) with `../data` and `../scripts` mounted |
+| `postgis/` | A lab copy of the central warehouse (same image + schema as `../warehouse`) for throwaway experiments |
+| `mcp-servers/` | Placeholder for MCP server configs |
+| `scratch/` | Personal working files, **gitignored**. Promote something into the folder above when it's worth keeping. |
 
-Quick start (local)
-1) Copy env files:
-   - make postgis-env
-   - make jupyter-env
-2) Start stacks:
-   - make postgis-up
-   - make jupyter-up
+```bash
+make -C notebooks jupyter-env   # then edit notebooks/jupyter/.env
+make -C notebooks jupyter-up    # http://127.0.0.1:8888
+```
 
-Windows note
-- Use `Makefile.windows` on Windows: `make -f delab/Makefile.windows postgis-up`
-
-Server quick start
-1) Set DNS for your domain to point at the server IP.
-2) Run:
-   - REPO_URL=<your-repo-url> DOMAIN=<your-domain> EMAIL=<your-email> bash delab/bootstrap.sh
-
-Host Nginx note
-- If you already run Nginx on the host, set `USE_HOST_NGINX=true` when running bootstrap.
-
-Bootstrap env file
-- Optional: copy `delab/.env.example` to `delab/.env` and export it before running:
-  - set -a; source delab/.env; set +a; bash delab/bootstrap.sh
+Nothing here is meant to be hosted publicly. To use a lab on a remote box, run
+it there and tunnel in (`ssh -L 8888:127.0.0.1:8888 <host>`).

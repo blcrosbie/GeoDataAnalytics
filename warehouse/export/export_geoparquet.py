@@ -60,7 +60,7 @@ ATTRIBUTE_SQL = """
 SELECT d.geoid, d.year, b.boundary_type, d.attribute_key, d.attribute_value,
        d.numeric_value, d.data_type, d.source, d.collection_date, d.confidence_level
 FROM public.geographic_data d
-JOIN public.geographic_boundaries b USING (geoid, year)
+JOIN public.geographic_boundaries b USING (summary_level, geoid, year)
 WHERE b.boundary_type = '{t}' AND d.year = {y}
 ORDER BY d.geoid, d.attribute_key
 """
@@ -164,7 +164,7 @@ def verify(con):
     for table, count_sql in (
         ("boundaries", "SELECT boundary_type, year, count(*)::bigint FROM public.geographic_boundaries GROUP BY 1,2"),
         ("attributes", "SELECT b.boundary_type, d.year, count(*)::bigint FROM public.geographic_data d "
-                       "JOIN public.geographic_boundaries b USING (geoid, year) GROUP BY 1,2"),
+                       "JOIN public.geographic_boundaries b USING (summary_level, geoid, year) GROUP BY 1,2"),
     ):
         src = {(r[0], r[1]): r[2] for r in con.execute("SELECT * FROM postgres_query('pg', ?)", [count_sql]).fetchall()}
         lake = {
