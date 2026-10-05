@@ -14,8 +14,14 @@ Members are read one at a time and each is streamed in BLOCK-sized record
 batches (pyarrow's incremental CSV reader), written to Parquet / COPYed to
 Postgres batch by batch, so memory stays at one batch, never one whole table.
 
+core --defer-indexes: detach geographic_data_acs_<Y>, drop every index but the
+unique key the upsert needs, load, then re-attach (Postgres rebuilds the dropped
+indexes in one sorted pass). Much faster than maintaining five indexes per row.
+A run killed while detached resumes on the next run; the year is invisible to
+queries until it re-attaches.
+
 Env:   WAREHOUSE_DSN   libpq DSN of the warehouse (core step)
-Usage: python load_acs_summary_file.py --year 2024 core
+Usage: python load_acs_summary_file.py --year 2024 core [--defer-indexes]
        python load_acs_summary_file.py --year 2024 lake --staging /big/disk/dir [--resume]
 """
 
@@ -173,10 +179,10 @@ WITH v AS (
            ON b.summary_level = s.summary_level AND b.geoid = s.geoid AND b.year = %(y)s
 ),
 ins AS (
-    INSERT INTO public.geographic_data
-        (geoid, year, source_survey, summary_level, attribute_key,
+    INSERT INTO {target}
+        ({id_col}geoid, year, source_survey, summary_level, attribute_key,
          numeric_value, data_type, source, collection_date)
-    SELECT geoid, %(y)s, 'acs', summary_level, attribute_key,
+    SELECT {id_val}geoid, %(y)s, 'acs', summary_level, attribute_key,
            numeric_value, 'numeric', %(src)s, %(cd)s
     FROM v WHERE has_boundary
     ON CONFLICT (source_survey, year, summary_level, geoid, attribute_key) DO UPDATE
@@ -254,11 +260,55 @@ def core_cells(t: pa.RecordBatch) -> io.StringIO:
     return buf
 
 
-def run_core(zf, year: int, root: str, tables: list[str] | None) -> None:
+def detach_partition(conn, year: int) -> str:
+    """Detach geographic_data_acs_<year> and drop all indexes but its unique key."""
+    part = f"public.geographic_data_acs_{year}"
+    with conn.cursor() as cur:
+        cur.execute("SELECT EXISTS (SELECT 1 FROM pg_inherits WHERE inhrelid = %s::regclass)",
+                    (part,))
+        if cur.fetchone()[0]:
+            cur.execute(f"ALTER TABLE public.geographic_data_acs DETACH PARTITION {part}")
+        cur.execute("SELECT conname FROM pg_constraint WHERE conrelid = %s::regclass "
+                    "AND contype = 'p'", (part,))
+        for (con,) in cur.fetchall():
+            cur.execute(f'ALTER TABLE {part} DROP CONSTRAINT "{con}"')
+        cur.execute("SELECT i.indexrelid::regclass::text FROM pg_index i WHERE i.indrelid = "
+                    "%s::regclass AND NOT EXISTS (SELECT 1 FROM pg_constraint c "
+                    "WHERE c.conindid = i.indexrelid)", (part,))
+        for (idx,) in cur.fetchall():
+            cur.execute(f"DROP INDEX {idx}")
+    conn.commit()
+    log.info("core %s: detached %s, deferred its indexes", year, part)
+    return part
+
+
+def attach_partition(conn, year: int, part: str) -> None:
+    """Re-attach; Postgres builds the missing parent indexes on the partition."""
+    t0 = time.time()
+    with conn.cursor() as cur:
+        cur.execute("SET maintenance_work_mem = '512MB'")
+        cur.execute(f"ALTER TABLE public.geographic_data_acs ATTACH PARTITION {part} "
+                    f"FOR VALUES FROM ({year}) TO ({year + 1})")
+        cur.execute(f"ANALYZE {part}")
+    conn.commit()
+    log.info("core %s: re-attached %s, indexes rebuilt in %.0fs", year, part, time.time() - t0)
+
+
+def run_core(zf, year: int, root: str, tables: list[str] | None, defer_indexes: bool) -> None:
     by = members(zf)
     shells = load_shells(year, root)
     src, cd = f"ACS {year} 5-year", f"{year}-12-31"
     conn = psycopg2.connect(os.environ.get("WAREHOUSE_DSN") or sys.exit("set WAREHOUSE_DSN"))
+    if defer_indexes:
+        # A detached partition loses the identity default, so draw ids from the parent's sequence.
+        part = detach_partition(conn, year)
+        merge = MERGE_SQL.format(target=part, id_col="id, ", id_val="nextval(%(seq)s), ")
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_get_serial_sequence('public.geographic_data', 'id')")
+            seq = cur.fetchone()[0]
+    else:
+        merge = MERGE_SQL.format(target="public.geographic_data", id_col="", id_val="")
+        seq = None
     tot_in = tot_un = 0
     for name in tables or CORE_TABLES:
         t0 = time.time()
@@ -270,7 +320,7 @@ def run_core(zf, year: int, root: str, tables: list[str] | None) -> None:
                 est_cols = est_cols or [c for c in b.schema.names if "_E" in c]
                 cur.copy_expert("COPY _stg_acs FROM STDIN", core_cells(b))
             cur.execute("ANALYZE _stg_acs")
-            cur.execute(MERGE_SQL, {"y": year, "src": src, "cd": cd})
+            cur.execute(merge, {"y": year, "src": src, "cd": cd, "seq": seq})
             n_in, n_un = cur.fetchone()
             cur.executemany("""
                 INSERT INTO public.attribute_catalog
@@ -289,6 +339,8 @@ def run_core(zf, year: int, root: str, tables: list[str] | None) -> None:
         tot_in += n_in; tot_un += n_un
         log.info("core %s %s: %d cells loaded, %d unmatched in %.0fs",
                  year, name, n_in, n_un, time.time() - t0)
+    if defer_indexes:
+        attach_partition(conn, year, part)
     conn.close()
     log.info("core %s done: %d loaded, %d unmatched", year, tot_in, tot_un)
 
@@ -300,7 +352,9 @@ def main(argv=None):
     p.add_argument("--root", default=MOUNT, help="Wasabi mount (or local mirror) root")
     p.add_argument("--tables", help="comma list of table ids (default: core list / all)")
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("core")
+    co = sub.add_parser("core")
+    co.add_argument("--defer-indexes", action="store_true",
+                    help="detach the year's partition and rebuild its indexes after the load")
     lk = sub.add_parser("lake")
     lk.add_argument("--staging", default=None, help="local dir for Parquet before upload")
     lk.add_argument("--resume", action="store_true",
@@ -310,7 +364,7 @@ def main(argv=None):
     tables = [t.strip().lower() for t in args.tables.split(",")] if args.tables else None
     zf = open_zip(args.year, args.root)
     if args.cmd == "core":
-        run_core(zf, args.year, args.root, tables)
+        run_core(zf, args.year, args.root, tables, args.defer_indexes)
     else:
         staging = args.staging or tempfile.mkdtemp(prefix=f"acs{args.year}_")
         run_lake(zf, args.year, staging, tables, args.resume)
