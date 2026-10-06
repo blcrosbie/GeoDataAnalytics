@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS public.geographic_data (
     created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (source_survey, year, summary_level, geoid, attribute_key, id),
-    CONSTRAINT uq_geo_cell UNIQUE (source_survey, year, summary_level, geoid, attribute_key)
+    -- One row per cell; also the ON CONFLICT target for loaders.
+    PRIMARY KEY (source_survey, year, summary_level, geoid, attribute_key)
 ) PARTITION BY LIST (source_survey);
 
 -- ---- Level-1: one LIST partition per survey, each RANGE-partitioned by year --

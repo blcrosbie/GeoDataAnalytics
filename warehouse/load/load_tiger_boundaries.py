@@ -89,6 +89,13 @@ def iter_chunks(files: list[str]) -> Iterator[gpd.GeoDataFrame]:
 def to_rows(g: gpd.GeoDataFrame, year: int, lvl: str, btype: str, source: str) -> pd.DataFrame:
     g = g.to_crs(4326)
     up = {c.upper(): c for c in g.columns}
+    # Some vintages suffix fields with the census year they derive from
+    # (2022 CD118: GEOID20, NAMELSAD20, ALAND20); map them to the plain name.
+    for c in g.columns:
+        base = re.sub(r"\d{2}$", "", c.upper())
+        if base != c.upper() and base in ("GEOID", "NAME", "NAMELSAD", "ALAND", "AWATER",
+                                          "INTPTLAT", "INTPTLON", "MTFCC", "FUNCSTAT"):
+            up.setdefault(base, c)
     col = lambda name: g[up[name]] if name in up else None
     geoid = col("GEOID")
     if geoid is None:

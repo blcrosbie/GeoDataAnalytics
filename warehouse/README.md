@@ -67,8 +67,10 @@ export WAREHOUSE_DSN="host=localhost port=5434 dbname=geodata user=geoadmin pass
 # 1. boundaries for the vintage (state, county, cbsa, tract, bg, cd, sldu, sldl)
 python load/load_tiger_boundaries.py --year 2024
 # 2. ACS 5-year: core tables into Postgres, every table into the lake
-python load/load_acs_summary_file.py --year 2024 core
-python load/load_acs_summary_file.py --year 2024 lake --staging /big/disk/tmp
+#    --defer-indexes: detach the year's partition, keep only the upsert key,
+#    rebuild the other indexes on re-attach (~2x faster for a full year)
+python load/load_acs_summary_file.py --year 2024 core --defer-indexes
+python load/load_acs_summary_file.py --year 2024 lake --staging /big/disk/tmp --resume
 # 3. crosswalk each older vintage onto the newest one, per level
 psql "$WAREHOUSE_DSN" -v level=140 -v from_year=2022 -v to_year=2024 -f load/build_crosswalk.sql
 ```
