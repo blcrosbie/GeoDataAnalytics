@@ -15,8 +15,9 @@ batches (pyarrow's incremental CSV reader), written to Parquet / COPYed to
 Postgres batch by batch, so memory stays at one batch, never one whole table.
 
 core --defer-indexes: detach geographic_data_acs_<Y>, drop every index but the
-unique key the upsert needs, load, then re-attach (Postgres rebuilds the dropped
-indexes in one sorted pass). Much faster than maintaining five indexes per row.
+primary key (the upsert's conflict target), load, then re-attach (Postgres
+rebuilds the dropped indexes in one sorted pass). Much faster than maintaining
+every index per row.
 A run killed while detached resumes on the next run; the year is invisible to
 queries until it re-attaches.
 
@@ -261,17 +262,13 @@ def core_cells(t: pa.RecordBatch) -> io.StringIO:
 
 
 def detach_partition(conn, year: int) -> str:
-    """Detach geographic_data_acs_<year> and drop all indexes but its unique key."""
+    """Detach geographic_data_acs_<year> and drop all indexes but its primary key."""
     part = f"public.geographic_data_acs_{year}"
     with conn.cursor() as cur:
         cur.execute("SELECT EXISTS (SELECT 1 FROM pg_inherits WHERE inhrelid = %s::regclass)",
                     (part,))
         if cur.fetchone()[0]:
             cur.execute(f"ALTER TABLE public.geographic_data_acs DETACH PARTITION {part}")
-        cur.execute("SELECT conname FROM pg_constraint WHERE conrelid = %s::regclass "
-                    "AND contype = 'p'", (part,))
-        for (con,) in cur.fetchall():
-            cur.execute(f'ALTER TABLE {part} DROP CONSTRAINT "{con}"')
         cur.execute("SELECT i.indexrelid::regclass::text FROM pg_index i WHERE i.indrelid = "
                     "%s::regclass AND NOT EXISTS (SELECT 1 FROM pg_constraint c "
                     "WHERE c.conindid = i.indexrelid)", (part,))
