@@ -48,6 +48,9 @@ utils/.utils
 spark-sedona-lab/output/
 spark-sedona-lab/data/
 
+# qgis-plugin-lab outputs (Earth Engine extracts, QGIS projects, screenshots)
+qgis-plugin-lab/results/
+
 # raw data lives in Wasabi (origin/); use the rclone mount or s3:// paths
 data/irs/
 data/natural_earth/
