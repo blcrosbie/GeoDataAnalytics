@@ -4,6 +4,10 @@ services:
       context: ./docker
     image: geo-warehouse:17
     restart: unless-stopped
+    # Hard RAM cap: a runaway query (e.g. a big pg_duckdb lake scan) gets OOM-killed
+    # inside the container (Postgres resets its connections) instead of starving the host.
+    mem_limit: ${WAREHOUSE_MEM_LIMIT:-8g}
+    memswap_limit: ${WAREHOUSE_MEM_LIMIT:-8g}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-geodata}
       POSTGRES_USER: ${POSTGRES_USER:-geoadmin}
