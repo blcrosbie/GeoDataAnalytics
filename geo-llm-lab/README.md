@@ -1,5 +1,11 @@
 # PostGIS ETL Test Suite
 
+> **Start with [`evals/`](evals/).** It's the rebuilt agent benchmark from
+> `docs/REPO_SPLIT_PLAN.md`: natural-language geo questions graded against gold
+> SQL run on the lake, with gold, Claude-baseline and GeoAgent HTTP agents. The
+> SQL suites below are older scaffolding and query `serving.*`/`staging.*`
+> tables that nothing creates yet.
+
 This directory contains a comprehensive test suite for validating the PostGIS ETL pipeline for the GeoDataAnalytics platform.
 
 ## Overview
