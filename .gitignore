@@ -58,3 +58,6 @@ data/geoagent-dev-s3/
 
 # warehouse TLS material
 warehouse/certs/
+
+# geo-llm-lab eval runs (results, SFT exports)
+geo-llm-lab/evals/results/
