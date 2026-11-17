@@ -9,6 +9,7 @@ charset-normalizer==3.4.4
 click==8.3.1
 click-plugins==1.1.1.2
 cligj==0.7.2
+duckdb==1.5.6
 colorama==0.4.6
 ecmwf-datastores-client==0.4.2
 fiona==1.10.1
