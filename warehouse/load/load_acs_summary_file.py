@@ -5,7 +5,8 @@ Load one ACS 5-year table-based Summary File vintage.
   lake : every table -> Parquet at
          <lake>/curated/acs/vintage=<Y>/table=<id>/part-0.parquet
          (all geographies, estimates + MOEs, raw values incl. Census sentinels)
-  core : CORE_TABLES estimates at MAP_LEVELS -> public.geographic_data (acs/<Y>)
+  core : (RETIRED with the Postgres warehouse, 2026-11-13; kept for reference)
+         CORE_TABLES estimates at MAP_LEVELS -> public.geographic_data (acs/<Y>)
          keyed 'acs:<table>_e<line>', validate-joined to geographic_boundaries;
          cells with no boundary go to geographic_data_unmatched.
 
@@ -22,7 +23,8 @@ A run killed while detached resumes on the next run; the year is invisible to
 queries until it re-attaches.
 
 Env:   WAREHOUSE_DSN   libpq DSN of the warehouse (core step)
-Usage: python load_acs_summary_file.py --year 2024 core [--defer-indexes]
+       LAKE_TARGETS + LAKE_<NAME>_*   where lake files go (see ../lake_targets.py)
+Usage: python load_acs_summary_file.py --year 2024 core
        python load_acs_summary_file.py --year 2024 lake --staging /big/disk/dir [--resume]
 """
 
@@ -31,7 +33,7 @@ import csv
 import io
 import logging
 import os
-import subprocess
+import shutil
 import sys
 import tempfile
 import time
@@ -42,7 +44,9 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
-import psycopg2
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import lake_targets  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("acs")
@@ -50,10 +54,12 @@ log = logging.getLogger("acs")
 HERE = os.path.dirname(os.path.abspath(__file__))
 MOUNT = os.path.join(HERE, "..", "..", "data", "geoagent-dev-s3")
 SF_DIR = "origin/census_surveys/acs/summary_file/{y}"
-LAKE_REMOTE = "wasabi:geoagent-dev-s3/curated/acs/vintage={y}"
+LAKE_PREFIX = "curated/acs/vintage={y}"
 
 # Map layers loaded into Postgres. Everything else stays lake-only.
-MAP_LEVELS = {"040", "050", "140", "150", "310", "500", "610", "620"}
+# 160 place and 860 ZCTA need their boundaries loaded first (load_tiger_boundaries.py
+# --layers place,zcta), or their cells land in geographic_data_unmatched.
+MAP_LEVELS = {"040", "050", "140", "150", "160", "310", "500", "610", "620", "860"}
 
 # Headline tables for the map (~340 estimate columns). Wide detail tables
 # (occupation, industry, language, insurance, disability, veterans, full
@@ -159,9 +165,12 @@ def run_lake(zf, year: int, staging: str, tables: list[str] | None, resume: bool
             writer.close()
             os.replace(out + ".tmp", out)
         log.info("lake %s %s: %d rows in %.1fs", year, name, rows, time.time() - t0)
-    log.info("uploading %s -> %s", out_root, LAKE_REMOTE.format(y=year))
-    subprocess.run(["rclone", "move", "--transfers", "16", out_root,
-                    LAKE_REMOTE.format(y=year)], check=True)
+    targets = lake_targets.load_targets()
+    prefix = LAKE_PREFIX.format(y=year)
+    log.info("uploading %s -> %s on %s", out_root, prefix, ",".join(t.name for t in targets))
+    n = lake_targets.publish_tree(out_root, prefix, targets)
+    log.info("uploaded %d files", n)
+    shutil.rmtree(out_root)
 
 
 # ---- core -------------------------------------------------------------------
@@ -295,6 +304,7 @@ def run_core(zf, year: int, root: str, tables: list[str] | None, defer_indexes: 
     by = members(zf)
     shells = load_shells(year, root)
     src, cd = f"ACS {year} 5-year", f"{year}-12-31"
+    import psycopg2  # core step only; the lake step needs no database
     conn = psycopg2.connect(os.environ.get("WAREHOUSE_DSN") or sys.exit("set WAREHOUSE_DSN"))
     if defer_indexes:
         # A detached partition loses the identity default, so draw ids from the parent's sequence.
