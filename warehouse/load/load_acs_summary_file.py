@@ -10,7 +10,9 @@ Load one ACS 5-year table-based Summary File vintage.
          keyed 'acs:<table>_e<line>', validate-joined to geographic_boundaries;
          cells with no boundary go to geographic_data_unmatched.
 
-The 5YRData.zip (12 GB, ~48 GB inside) is read in place from the Wasabi mount.
+The 5YRData.zip (12 GB, ~48 GB inside) comes from census.gov. It is downloaded
+once into --root, at the same path as on www2.census.gov, read in place from
+there and kept for reruns. It is never uploaded; only the Parquet is.
 Members are read one at a time and each is streamed in BLOCK-sized record
 batches (pyarrow's incremental CSV reader), written to Parquet / COPYed to
 Postgres batch by batch, so memory stays at one batch, never one whole table.
@@ -37,6 +39,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
+import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import lake_targets  # noqa: E402
@@ -44,9 +47,10 @@ import lake_targets  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("acs")
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-MOUNT = os.path.join(HERE, "..", "..", "data", "geoagent-dev-s3")
-SF_DIR = "origin/census_surveys/acs/summary_file/{y}"
+CENSUS = "https://www2.census.gov/"
+SF_DIR = "programs-surveys/acs/summary_file/{y}"  # same path on census.gov and under --root
+DEFAULT_ROOT = os.path.join(os.getenv("LAKE_STAGING") or tempfile.gettempdir(), "acs-sf")
+UA = {"User-Agent": "GeoDataAnalytics-acs-fetch/1.0"}
 LAKE_PREFIX = "curated/acs/vintage={y}"
 
 # Map layers loaded into Postgres. Everything else stays lake-only.
@@ -85,13 +89,45 @@ BLOCK = 32 << 20  # bytes of CSV text per record batch
 
 
 def sf_path(year: int, root: str, *candidates: str) -> str:
-    """First existing file among layouts: table-based-SF/ (2021+) or prototype/ (2020)."""
-    base = os.path.join(root, SF_DIR.format(y=year))
-    for c in candidates:
-        path = os.path.join(base, c.format(y=year))
+    """First file among layouts, table-based-SF/ (2021+) or prototype/ (2020):
+    already under root, else downloaded there from census.gov."""
+    rel = SF_DIR.format(y=year)
+    paths = [(c.format(y=year), os.path.join(root, rel, c.format(y=year))) for c in candidates]
+    for _, path in paths:
         if os.path.exists(path):
             return path
-    raise SystemExit(f"ACS {year}: none of {candidates} under {base}")
+    for c, path in paths:
+        url = f"{CENSUS}{rel}/{c}"
+        if requests.head(url, headers=UA, timeout=60, allow_redirects=True).ok:
+            download(url, path)
+            return path
+    raise SystemExit(f"ACS {year}: none of {candidates} under {os.path.join(root, rel)} or on census.gov")
+
+
+def download(url: str, path: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    for attempt in range(4):
+        try:
+            with requests.get(url, headers=UA, stream=True, timeout=300) as r:
+                r.raise_for_status()
+                size = int(r.headers.get("Content-Length") or 0)
+                log.info("downloading %s (%.1f GB) -> %s", url, size / 1e9, path)
+                done, step = 0, 1 << 30
+                with open(path + ".tmp", "wb") as f:
+                    for chunk in r.iter_content(8 << 20):
+                        f.write(chunk)
+                        done += len(chunk)
+                        if size and done // step != (done - len(chunk)) // step:
+                            log.info("  %.1f / %.1f GB", done / 1e9, size / 1e9)
+            if size and os.path.getsize(path + ".tmp") != size:
+                raise requests.RequestException(f"short read: {os.path.getsize(path + '.tmp')} of {size} bytes")
+            os.replace(path + ".tmp", path)
+            return
+        except requests.RequestException as e:
+            if attempt == 3:
+                raise
+            log.warning("retry %s (%s)", url, e)
+            time.sleep(10 * (attempt + 1))
 
 
 def open_zip(year: int, root: str) -> zipfile.ZipFile:
@@ -307,7 +343,8 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--year", type=int, required=True)
-    p.add_argument("--root", default=MOUNT, help="Wasabi mount (or local mirror) root")
+    p.add_argument("--root", default=DEFAULT_ROOT,
+                   help="where the Summary File is cached (downloaded from census.gov if missing)")
     p.add_argument("--tables", help="comma list of table ids (default: core list / all)")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("core")

@@ -2,11 +2,11 @@
 """
 The Postgres source was retired on 2026-11-13, so `boundaries`, `attributes`
 and `verify` no longer have anything to read; new boundary partitions come
-from ../../scripts/tiger_to_lake.py. `sync` needs no database and is the
-way to keep the AWS and Wasabi copies identical.
+from ../../scripts/tiger_to_lake.py. The `sync` command (AWS -> Wasabi mirror)
+was removed with the Wasabi bucket on 2026-11-19. Kept for reference only.
 
 Export the public warehouse tables from Postgres to GeoParquet in the lake
-(AWS S3 and/or Wasabi, see ../lake_targets.py).
+(AWS S3, see ../lake_targets.py).
 
 Layout (hive-partitioned so DuckDB/pg_duckdb/Sedona prune by path):
 
@@ -18,20 +18,18 @@ plus bbox xmin/ymin/xmax/ymax) so readers can filter on plain columns before
 touching geometry. Rows are sorted by h3_r5 so Parquet row-group stats prune.
 
 Each partition is written once to local staging, row-counted, then uploaded
-byte-for-byte to every lake target (LAKE_TARGETS, primary first), so AWS and
-Wasabi never drift. Only public reference data is exported. App-side columns
+to the lake. Only public reference data is exported. App-side columns
 (layer_id, source_upload_id) are dropped.
 
 Env:
   SOURCE_PG_DSN   libpq DSN of the source DB (read-only use)
-  LAKE_TARGETS + LAKE_<NAME>_*   (or the legacy LAKE_BUCKET / LAKE_S3_*)
+  LAKE_TARGETS + LAKE_<NAME>_*   (see ../lake_targets.py)
   LAKE_STAGING    local scratch dir (default: system temp); needs ~1 GB free
 
 Usage:
   python export_geoparquet.py boundaries [--type ZCTA520] [--year 2025] [--force]
   python export_geoparquet.py attributes [--type BG] [--year 2020] [--force]
-  python export_geoparquet.py verify                    # source vs primary rows, primary vs mirrors keys
-  python export_geoparquet.py sync [--prefix curated/] [--dry-run]   # primary -> mirrors
+  python export_geoparquet.py verify                    # source vs lake row counts
 """
 
 import argparse
@@ -175,7 +173,7 @@ def export(con, targets, table, t=None, y=None, force=False):
 
 
 def verify(con, targets):
-    """Row counts per partition: source vs primary. Keys and sizes: primary vs each mirror."""
+    """Row counts per partition: source vs lake."""
     primary = targets[0]
     bad = 0
     for table, count_sql in (
@@ -197,49 +195,22 @@ def verify(con, targets):
                 log.warning("%s %s: source=%s %s=%s", table, k, n, primary.name, lake.get(k))
         log.info("%s: %d partitions, source rows=%d, %s rows=%d",
                  table, len(src), sum(src.values()), primary.name, sum(lake.values()))
-    bad += mirror_parity(targets, f"{PREFIX}/")
     if bad:
         sys.exit(f"{bad} problem(s) found")
     log.info("verify OK")
 
 
-def mirror_parity(targets, prefix):
-    primary, bad = targets[0], 0
-    ref = primary.list(prefix)
-    for m in targets[1:]:
-        other = m.list(prefix)
-        missing = [k for k in ref if k not in other]
-        differ = [k for k in ref if k in other and other[k] != ref[k]]
-        bad += len(missing) + len(differ)
-        log.info("%s vs %s under %s: %d objects, %d missing, %d size mismatch",
-                 primary.name, m.name, prefix, len(ref), len(missing), len(differ))
-        for k in (missing + differ)[:10]:
-            log.warning("  %s", k)
-    return bad
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("table", choices=["boundaries", "attributes", "verify", "sync"])
+    ap.add_argument("table", choices=["boundaries", "attributes", "verify"])
     ap.add_argument("--type", dest="btype")
     ap.add_argument("--year", type=int)
     ap.add_argument("--force", action="store_true")
-    ap.add_argument("--targets", help="override LAKE_TARGETS, e.g. wasabi,aws")
-    ap.add_argument("--prefix", default=f"{PREFIX}/", help="sync: key prefix to mirror")
-    ap.add_argument("--dry-run", action="store_true", help="sync: list what would be copied")
+    ap.add_argument("--targets", help="override LAKE_TARGETS")
     a = ap.parse_args()
 
     targets = lake_targets.load_targets(a.targets)
     log.info("targets: %s", ", ".join(f"{t.name}=s3://{t.bucket}" for t in targets))
-
-    if a.table == "sync":
-        if len(targets) < 2:
-            sys.exit("sync needs at least two targets (primary first)")
-        staging = os.getenv("LAKE_STAGING") or tempfile.gettempdir()
-        for m in targets[1:]:
-            copied, ok = lake_targets.sync(targets[0], m, a.prefix, staging, a.dry_run)
-            log.info("%s: copied %d, already in sync %d", m.name, copied, ok)
-        return
 
     con = connect(targets)
     if a.table == "verify":

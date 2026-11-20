@@ -18,7 +18,8 @@ Writes (curated/media/fcc/, snapshot = run date):
   stations/snapshot=<D>/part-0.parquet
   contours/snapshot=<D>/band=<fm|tv|am>/part-0.parquet          GeoParquet, OGC:CRS84
   coverage/snapshot=<D>/level=<station|county|cbsa|zcta|tract>/part-0.parquet
-Raw FCC responses are archived under origin/fcc/<D>/ on ORIGIN_TARGET.
+Raw FCC lists and contour responses stay in local --staging and are never
+uploaded; the FCC serves them for free, so only the built Parquet goes to the lake.
 
 Contour fetch is resumable (responses are appended to a local NDJSON under
 --staging and skipped on re-run). The API computes each contour live (~2-3 s),
@@ -43,7 +44,6 @@ Usage:
 import argparse
 import concurrent.futures as cf
 import datetime as dt
-import gzip
 import json
 import logging
 import os
@@ -85,13 +85,6 @@ URBAN_CLASSES = ("urban", "suburban", "exurban", "rural")
 
 
 # ---------------------------------------------------------------------- utils
-def targets_and_origin():
-    targets = lake_targets.load_targets()
-    name = os.getenv("ORIGIN_TARGET", "wasabi")
-    origin = lake_targets.load_targets(name) if os.getenv(f"LAKE_{name.upper()}_BUCKET") else []
-    return targets, origin
-
-
 def connect(targets):
     con = duckdb.connect()
     for ext in ("httpfs", "spatial"):
@@ -152,7 +145,7 @@ def parse_query(path: str, band: str) -> list[dict]:
     return rows
 
 
-def run_stations(a, targets, origin, snapshot):
+def run_stations(a, targets, snapshot):
     raw = os.path.join(a.staging, "fcc", snapshot, "raw")
     os.makedirs(raw, exist_ok=True)
     rows = []
@@ -164,8 +157,6 @@ def run_stations(a, targets, origin, snapshot):
             with open(path + ".tmp", "wb") as f:
                 f.write(r.content)
             os.replace(path + ".tmp", path)
-        if origin and not a.out:
-            lake_targets.publish(path, f"origin/fcc/{snapshot}/{band}q_list4.txt", origin)
         part = parse_query(path, band)
         log.info("%s: %d records", band, len(part))
         rows += part
@@ -204,10 +195,10 @@ def wanted_facilities(a, snapshot) -> list[tuple[str, int, str, str | None]]:
     return out
 
 
-def run_contours(a, targets, origin, snapshot):
+def run_contours(a, targets, snapshot):
     base = os.path.join(a.staging, "fcc", snapshot)
     if not os.path.exists(os.path.join(base, "raw", "fmq.txt")):
-        run_stations(a, targets, origin, snapshot)
+        run_stations(a, targets, snapshot)
     want = wanted_facilities(a, snapshot)
     resp_path = os.path.join(base, "contour_responses.ndjson")
     done = set()
@@ -263,10 +254,10 @@ def run_contours(a, targets, origin, snapshot):
                     out.flush()
                     rate = n / (time.time() - t0)
                     log.info("  %d/%d (%.1f/s, ~%.0f min left)", n, len(todo), rate, (len(todo) - n) / rate / 60)
-    build_contours(a, targets, origin, snapshot, resp_path)
+    build_contours(a, targets, snapshot, resp_path)
 
 
-def build_contours(a, targets, origin, snapshot, resp_path):
+def build_contours(a, targets, snapshot, resp_path):
     base = os.path.dirname(resp_path)
     feats_path = os.path.join(base, "contour_features.ndjson")
     st = {}
@@ -367,16 +358,10 @@ def build_contours(a, targets, origin, snapshot, resp_path):
             FROM c WHERE band = '{band}' ORDER BY h3_r5, facility_id, feature_seq)
           TO '{local}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 5000)""")
         publish(local, key, targets, a.out)
-    if origin and not a.out:
-        gz = resp_path + ".gz"
-        with open(resp_path, "rb") as src, gzip.open(gz, "wb", compresslevel=6) as dst:
-            dst.writelines(src)
-        lake_targets.publish(gz, f"origin/fcc/{snapshot}/contour_responses.ndjson.gz", origin)
-        os.remove(gz)
 
 
 # ------------------------------------------------------------------- coverage
-def run_coverage(a, targets, origin, snapshot):
+def run_coverage(a, targets, snapshot):
     con = connect(targets)
     src = targets[0].url("")
     cont = (os.path.join(a.out, "curated", "media", "fcc", "contours").replace(os.sep, "/") if a.out
@@ -458,17 +443,17 @@ def main(argv=None):
     a.staging = os.path.abspath(a.staging)
     if a.out:
         a.out = os.path.abspath(a.out)
-    targets, origin = targets_and_origin()
+    targets = lake_targets.load_targets()
 
     if a.step in ("stations", "all"):
-        run_stations(a, targets, origin, a.snapshot)
+        run_stations(a, targets, a.snapshot)
     if a.step in ("contours", "all"):
-        run_contours(a, targets, origin, a.snapshot)
+        run_contours(a, targets, a.snapshot)
     if a.step == "rebuild-contours":
-        build_contours(a, targets, origin, a.snapshot,
+        build_contours(a, targets, a.snapshot,
                        os.path.join(a.staging, "fcc", a.snapshot, "contour_responses.ndjson"))
     if a.step in ("coverage", "all"):
-        run_coverage(a, targets, origin, a.snapshot)
+        run_coverage(a, targets, a.snapshot)
 
 
 if __name__ == "__main__":
