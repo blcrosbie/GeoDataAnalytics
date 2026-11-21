@@ -34,8 +34,8 @@ spatial index. The layout does that work instead:
 - **Precomputed weights.** Drawn-shape population comes from an H3 table
   (section 3), which is a cell lookup instead of a polygon overlay.
 - **Warm process.** A long-lived DuckDB process (container or provisioned
-  Lambda) caches metadata and hot objects. The gold eval answers 14 questions
-  straight from S3 at p50 0.4 s and max 2.1 s from a laptop.
+  Lambda) caches metadata and hot objects. The gold eval answers 18 questions
+  straight from S3 at p50 0.2 s and max 1.6 s from a laptop (2026-11-20).
 
 ### When to add PostGIS back (and why not Aurora)
 
@@ -62,9 +62,9 @@ retired Postgres warehouse (`warehouse/README.md`).
   part of the path, so a reload never overwrites history silently.
 - Boundaries carry `h3_r5`, `h3_r7` and the bbox columns, sorted by `h3_r5`, so row-group
   statistics prune before any geometry is read.
-- Every object is written once from local staging, then uploaded to each target
-  with a `sha256` in its metadata. `export_geoparquet.py verify` checks source rows
-  against the primary target and keys and sizes across mirrors.
+- Every object is written once in local staging, then uploaded with a `sha256`
+  in its metadata. The boundary build checks each partition before uploading
+  it: the row count must match the source, and no GEOID may repeat.
 
 ## 2. Geographic data model
 
@@ -200,11 +200,16 @@ trajectories are exported as fine-tuning data for a smaller, cheaper GeoLLM.
 
 ## 7. QA, provenance, versioning
 
-- Vintage in every key and path. Reloads replace one `(layer, vintage)` in a single
-  transaction.
-- Row-count and key-parity checks after every export (`export_geoparquet.py verify`).
-- Quarantine instead of dropping: rows that fail keys go to `legacy.*`, with counts
-  accounted for (see the split plan).
+- Vintage in every key and path. A reload replaces one `(layer, vintage)` object.
+- Builds that can be checked refuse to publish when a check fails:
+  - `tiger_to_lake.py` stops on a row-count mismatch with the source, or on a
+    duplicate GEOID.
+  - `lodes_rollup_to_lake.py` stops unless totals reconcile across levels (for
+    example, block-group jobs must equal tract jobs).
+  - The other scripts log the row count of each file they publish.
+- Quarantine instead of dropping. When the legacy Postgres data was migrated,
+  rows that failed their keys went to `legacy.*`, with counts accounted for (see
+  the split plan).
 - The gold-SQL eval doubles as a data regression test. `--agent gold` must stay at 100%.
 
 ## 8. Status

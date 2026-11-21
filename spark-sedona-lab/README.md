@@ -1,4 +1,10 @@
-# Spark + Apache Sedona Interview Lab
+# Spark + Apache Sedona Lab
+
+The rest of this repo uses DuckDB on one machine. This lab does the same
+kind of spatial work on a distributed engine: a point-in-polygon join,
+partitioned GeoParquet output and an Airflow DAG for managed compute.
+[`USECASE.md`](USECASE.md) collects the vocabulary, rules of thumb and red
+flags.
 
 This lab is intentionally small. It teaches Spark/Sedona execution semantics on one machine; it does **not** pretend Docker Desktop is a production cluster.
 

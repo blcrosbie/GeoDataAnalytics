@@ -1,5 +1,18 @@
 # Repo split plan
 
+> **Historical record, written October 2026.** Two things it assumes no longer
+> exist:
+>
+> - **The Postgres warehouse.** It was retired on 2026-11-13, and the S3 lake
+>   is now the system of record.
+> - **The Wasabi bucket.** It was dropped on 2026-11-19; one AWS bucket holds
+>   only curated data.
+>
+> The migration counts, the GEOID-collision findings and the history-shrinking
+> notes below still stand. For the current layout and status, see the
+> [top-level README](../README.md) and
+> [`GEO_FOUNDATION_ARCHITECTURE.md`](GEO_FOUNDATION_ARCHITECTURE.md).
+
 ## Recommendation: keep it mostly whole (`edu/` has since been dropped)
 
 This repo has three jobs:

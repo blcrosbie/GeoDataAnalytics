@@ -119,10 +119,13 @@ GeoPandas (`gpd.read_parquet`), Apache Sedona or QGIS.
   - **Spatial keys:** boundary rows carry `h3_r5`, `h3_r7` and a bounding box,
     and are sorted by `h3_r5`. Parquet statistics then skip most of a file
     before any polygon is decoded.
-- **Data is checked before it's published.**
-  - Row counts must match the source, and GEOIDs must be unique.
-  - Rollups must reconcile. For example, block-group jobs must equal tract
-    jobs, and place jobs can never exceed county jobs.
+- **Bad builds aren't published.**
+  - The boundary build stops if a partition's row count doesn't match the
+    source, or if a GEOID repeats.
+  - The LODES rollups stop unless their totals reconcile. For example,
+    block-group jobs must equal tract jobs, and place jobs can never exceed
+    county jobs.
+  - The other scripts log the row count of every file they publish.
   - Every object is stored with its sha256 in its S3 metadata.
 - **The vintage is in the path.** A reload replaces one layer and year, so
   history is never overwritten without notice.
@@ -139,6 +142,7 @@ questions cover:
 - population within a radius or a drawn rectangle
 - RUCA and urbanicity classification
 - ACS trends across releases
+- broadcast coverage: which FM stations cover a ZIP
 - abstention, where the right answer is "that data isn't loaded"
 
 | Agent | What it measures |

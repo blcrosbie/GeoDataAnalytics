@@ -1,4 +1,4 @@
-# Spark/Sedona Use cases
+# Spark + Sedona: concepts and rules of thumb
 
 ## One-sentence architecture
 
@@ -18,7 +18,7 @@ Airflow schedules a parameterized job; Spark builds and optimizes a lazy distrib
 - **AQE:** runtime plan adaptation based on observed statistics.
 - **Data skew:** a few keys or spatial regions dominate work and create straggler tasks.
 
-## Things to say
+## Rules of thumb
 
 - Prefer Spark/Sedona built-in expressions over Python UDFs so the engine can optimize the plan.
 - Filter columns and rows before a join; do not move data to the driver to perform business logic.
