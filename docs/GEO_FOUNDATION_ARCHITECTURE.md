@@ -15,7 +15,7 @@ PostGIS serving tier is an add-on with a clear trigger, not the default.
 
 | Tier | Holds | Serves | Here |
 |---|---|---|---|
-| **Lake**: GeoParquet on S3 | Every vintage of every layer, ACS (all tables, all geographies), reference tables, crosswalks. The system of record. | Batch builds, analytics, the LLM agent's SQL, tile builds, drawn-shape queries via the H3/bbox prefilter | `s3://…/curated/` on AWS (primary), byte-identical archive on Wasabi (`warehouse/lake_targets.py`). Built by `scripts/tiger_to_lake.py`, `scripts/get_reference_data.py` and the ACS loader. |
+| **Lake**: GeoParquet on S3 | Every vintage of every layer, ACS (all tables, all geographies), reference tables, crosswalks. The system of record. | Batch builds, analytics, the LLM agent's SQL, tile builds, drawn-shape queries via the H3/bbox prefilter | `s3://…/curated/` on AWS, the only copy (`warehouse/lake_targets.py`). Only curated files are uploaded; raw sources are re-downloaded from the publisher when needed. Built by `scripts/tiger_to_lake.py`, `scripts/get_reference_data.py` and the ACS loader. |
 | **Compute**: DuckDB (spatial + h3 + httpfs) | Nothing. It's stateless and reads the lake in place. | Any query, embedded in the process that needs it: notebook, script, Lambda/container behind the app, the eval runner | `geo-llm-lab/evals/runner.py` is a working example |
 | **Tiles**: PMTiles on S3/CloudFront | Simplified display geometry per zoom | MapLibre or deck.gl rendering. No query engine is touched to draw the map. | Built by tippecanoe from the lake (the GeoAgent `geoagent-boundaries` image) |
 
@@ -34,8 +34,8 @@ spatial index. The layout does that work instead:
 - **Precomputed weights.** Drawn-shape population comes from an H3 table
   (section 3), which is a cell lookup instead of a polygon overlay.
 - **Warm process.** A long-lived DuckDB process (container or provisioned
-  Lambda) caches metadata and hot objects. The gold eval answers 14 questions
-  straight from S3 at p50 0.4 s and max 2.1 s from a laptop.
+  Lambda) caches metadata and hot objects. The gold eval answers 18 questions
+  straight from S3 at p50 0.2 s and max 1.6 s from a laptop (2026-11-20).
 
 ### When to add PostGIS back (and why not Aurora)
 
@@ -62,9 +62,9 @@ retired Postgres warehouse (`warehouse/README.md`).
   part of the path, so a reload never overwrites history silently.
 - Boundaries carry `h3_r5`, `h3_r7` and the bbox columns, sorted by `h3_r5`, so row-group
   statistics prune before any geometry is read.
-- Every object is written once from local staging, then uploaded to each target
-  with a `sha256` in its metadata. `export_geoparquet.py verify` checks source rows
-  against the primary target and keys and sizes across mirrors.
+- Every object is written once in local staging, then uploaded with a `sha256`
+  in its metadata. The boundary build checks each partition before uploading
+  it: the row count must match the source, and no GEOID may repeat.
 
 ## 2. Geographic data model
 
@@ -200,25 +200,30 @@ trajectories are exported as fine-tuning data for a smaller, cheaper GeoLLM.
 
 ## 7. QA, provenance, versioning
 
-- Vintage in every key and path. Reloads replace one `(layer, vintage)` in a single
-  transaction.
-- Row-count and key-parity checks after every export (`export_geoparquet.py verify`).
-- Quarantine instead of dropping: rows that fail keys go to `legacy.*`, with counts
-  accounted for (see the split plan).
+- Vintage in every key and path. A reload replaces one `(layer, vintage)` object.
+- Builds that can be checked refuse to publish when a check fails:
+  - `tiger_to_lake.py` stops on a row-count mismatch with the source, or on a
+    duplicate GEOID.
+  - `lodes_rollup_to_lake.py` stops unless totals reconcile across levels (for
+    example, block-group jobs must equal tract jobs).
+  - The other scripts log the row count of each file they publish.
+- Quarantine instead of dropping. When the legacy Postgres data was migrated,
+  rows that failed their keys went to `legacy.*`, with counts accounted for (see
+  the split plan).
 - The gold-SQL eval doubles as a data regression test. `--agent gold` must stay at 100%.
 
 ## 8. Status
 
 | Capability | State |
 |---|---|
-| Storage | S3 only (AWS primary, Wasabi archive). Postgres warehouse retired 2026-11-13 |
-| TIGER state/county/tract/BG/place/CBSA/CD/SLD, 2011–2025 | In lake (AWS + Wasabi), complete. On 2026-11-16 an audit found missing states in some partitions: TRACT 2011/2016/2017/2024, BG 2025, and SLDU/SLDL in every year. The causes were corrupt or missing zips in `origin/` and gaps from the Postgres load. Those zips were replaced, the partitions rebuilt with `tiger_to_lake.py` and checked to only add rows, then published. SLD names are now NAMELSAD. Census published no CBSA file for 2022 |
+| Storage | AWS S3 only, curated data only. Postgres warehouse retired 2026-11-13; Wasabi mirror and raw `origin/` archive dropped 2026-11-19 |
+| TIGER state/county/tract/BG/place/CBSA/CD/SLD, 2011–2025 | In lake, complete. On 2026-11-16 an audit found missing states in some partitions: TRACT 2011/2016/2017/2024, BG 2025, and SLDU/SLDL in every year. The causes were corrupt or missing zips in `origin/` and gaps from the Postgres load. Those zips were replaced, the partitions rebuilt with `tiger_to_lake.py` and checked to only add rows, then published. SLD names are now NAMELSAD. Census published no CBSA file for 2022 |
 | ZCTA520 2020–2025 | In lake, built from the raw zips by `scripts/tiger_to_lake.py` |
-| UAC20, CSA, METDIV, COUSUB, AIANNH, PUMA20 | 2025 in lake (raw zips archived to `origin/`); earlier vintages on request |
+| UAC20, CSA, METDIV, COUSUB, AIANNH, PUMA20 | 2025 in lake; earlier vintages on request |
 | ACS 5-year 2020–2024, all tables and geographies | In lake |
 | ACS 5-year 2014–2019, GeoAgent's 12 tables, 8 levels | In lake (`scripts/acs_api_to_lake.py`); 2010-census tracts/BGs/ZCTAs |
 | Gazetteer 2025, ZCTA relationship files, RUCA 2020 | In lake (`scripts/get_reference_data.py`) |
-| LODES 8 jobs, resident workers, commute flows | In lake: block level under `reference/lodes` (2024; Michigan 2021; Alaska not published since 2016), tract/county/county-to-county rollups under `derived/lodes/year=2024` (`scripts/lodes_rollup_to_lake.py`) |
+| LODES 8 jobs, resident workers, commute flows | In lake: block level under `reference/lodes` (2024; Michigan 2021; Alaska not published since 2016), rollups under `derived/lodes/year=2024` (`scripts/lodes_rollup_to_lake.py`): tract, block group, county, place, ZCTA, CBSA and state legislative district (SLDU/SLDL), plus county-to-county flows. Place, ZCTA, CBSA and district membership come from the LODES block crosswalk; blocks outside any such area are left out |
 | Urban/suburban/exurban/rural | In lake, ACS 2024 (`scripts/urbanicity_to_lake.py`) |
 | FCC stations, contours, coverage (FM, TV, Class A, AM) | In lake (`scripts/fcc_to_lake.py --services core`); translators/LPFM/LPTV with `--services all` |
 | Station ownership (parent companies) | Next: LMS dump ownership tables → licensee → parent |

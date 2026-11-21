@@ -16,13 +16,14 @@ GeoAgent tile build, geo-llm-lab/evals) see no difference:
 
 Rows are sorted by h3_r5, geoid; invalid shapes are repaired with ST_MakeValid;
 duplicate GEOIDs abort the build. Each partition is written once to local
-staging and uploaded byte-for-byte to every lake target (warehouse/lake_targets.py).
+staging and uploaded to the lake (warehouse/lake_targets.py).
 
 Source zips, first hit wins:
   --root DIR          local tree laid out as DIR/<Y>/tl_<Y>_<us|SS>_<stem>.zip
-  origin archive      origin/census/<Y>/ on ORIGIN_TARGET (default "wasabi")
   census.gov          https://www2.census.gov/geo/tiger/TIGER<Y>/<DIR>/ (directory listing)
-With --archive-raw, zips fetched from census.gov are also copied to the origin archive.
+Downloaded zips sit in staging only and are deleted once their partition is
+published (--keep-raw keeps them). Raw zips are never uploaded: census.gov
+serves them for free, so only the built GeoParquet goes to the lake.
 
 Vintage-suffixed layers (zcta520, uac20, puma20, cd119) take the highest suffix
 available and carry it in boundary_type (ZCTA520, UAC20, PUMA20, CD119).
@@ -104,10 +105,10 @@ def pick_states(names, year, layer):
 
 
 class Source:
-    """Finds and fetches raw zips: local root, then origin archive, then census.gov."""
+    """Finds and fetches raw zips: local root, then census.gov."""
 
-    def __init__(self, root, origin, raw_dir, archive_raw):
-        self.root, self.origin, self.raw, self.archive = root, origin, raw_dir, archive_raw
+    def __init__(self, root, raw_dir):
+        self.root, self.raw = root, raw_dir
         self._census_dirs = {}
 
     def candidates(self, year):
@@ -115,9 +116,6 @@ class Source:
             d = os.path.join(self.root, str(year))
             if os.path.isdir(d):
                 yield "local", {n: os.path.join(d, n) for n in os.listdir(d) if n.endswith(".zip")}
-        if self.origin:
-            keys = self.origin.list(f"origin/census/{year}/")
-            yield "origin", {k.rsplit("/", 1)[-1]: k for k in keys if k.endswith(".zip")}
         yield "census", None  # resolved lazily per layer (one listing per directory)
 
     def census_listing(self, year, layer):
@@ -153,9 +151,6 @@ class Source:
         if os.path.exists(local):
             return local
         os.makedirs(self.raw, exist_ok=True)
-        if kind == "origin":
-            self.origin.download(ref, local)
-            return local
         for attempt in range(4):
             try:
                 with requests.get(ref, headers=UA, stream=True, timeout=300) as r:
@@ -169,9 +164,6 @@ class Source:
                     raise
                 log.warning("retry %s (%s)", ref, e)
                 time.sleep(10 * (attempt + 1))
-        if self.archive and self.origin:
-            year = re.search(r"tl_(\d{4})_", local).group(1)
-            lake_targets.publish(local, f"origin/census/{year}/{os.path.basename(local)}", [self.origin])
         return local
 
 
@@ -273,8 +265,7 @@ def main(argv=None):
     ap.add_argument("--layers", required=True, help=f"comma list of {','.join(LAYERS)}")
     ap.add_argument("--root", help="local TIGER tree (<root>/<Y>/tl_*.zip), tried first")
     ap.add_argument("--staging", default=os.getenv("LAKE_STAGING") or tempfile.gettempdir())
-    ap.add_argument("--force", action="store_true", help="rebuild even if the partition is on every target")
-    ap.add_argument("--archive-raw", action="store_true", help="copy zips fetched from census.gov to the origin archive")
+    ap.add_argument("--force", action="store_true", help="rebuild even if the partition is already in the lake")
     ap.add_argument("--keep-raw", action="store_true", help="keep downloaded zips in staging")
     ap.add_argument("--dry-run", action="store_true", help="resolve sources and keys, write nothing")
     ap.add_argument("--out", help="write the parquet here and stop (no upload); for testing")
@@ -288,12 +279,8 @@ def main(argv=None):
 
     local_only = bool(a.out)
     targets = [] if local_only else lake_targets.load_targets()
-    origin_name = os.getenv("ORIGIN_TARGET", "wasabi")
-    origin = None
-    if os.getenv(f"LAKE_{origin_name.upper()}_BUCKET"):
-        origin = lake_targets.load_targets(origin_name)[0]
     staging = os.path.join(a.staging, "tiger")
-    src = Source(a.root, origin, os.path.join(staging, "raw"), a.archive_raw)
+    src = Source(a.root, os.path.join(staging, "raw"))
     con = connect(targets)
 
     for year in years:
@@ -304,7 +291,7 @@ def main(argv=None):
                 continue
             key = f"curated/boundaries/boundary_type={btype}/year={year}/part-0.parquet"
             if targets and not a.force and all(t.head(key) for t in targets):
-                log.info("skip %s (on all targets; --force to rebuild)", key)
+                log.info("skip %s (already in the lake; --force to rebuild)", key)
                 continue
             log.info("%s %s: %d file(s) from %s -> %s", btype, year, len(refs), kind, key)
             if a.dry_run:

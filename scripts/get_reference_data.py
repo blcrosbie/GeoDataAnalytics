@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Fetch the non-TIGER reference datasets a national geographic layer needs, keep
-the raw files in the archive, and publish typed Parquet to the lake.
+Fetch the non-TIGER reference datasets a national geographic layer needs and
+publish them to the lake as typed Parquet.
 
   gazetteer  Census Gazetteer: one row per geography with land/water area and
              internal point (zcta, place, county, tract, ua, cbsa, cousub)
@@ -11,15 +11,16 @@ the raw files in the archive, and publish typed Parquet to the lake.
   lodes      LEHD LODES8 workplace (WAC) and residence (RAC) job counts by block,
              plus the block crosswalk; OD (commute flows) with --od
 
-Lake layout (every lake target, see warehouse/lake_targets.py):
+Lake layout (see warehouse/lake_targets.py):
 
   curated/reference/gazetteer/layer=<zcta|place|...>/year=<Y>/part-0.parquet
   curated/reference/rel2020/pair=<zcta520_tract20|...>/part-0.parquet
   curated/reference/ruca/vintage=2020/level=<tract|zip>/part-0.parquet
   curated/reference/lodes/kind=<wac|rac|od|xwalk>/year=<Y>/state=<st>/part-0.parquet
 
-Raw downloads go to origin/reference/<dataset>/... on ORIGIN_TARGET (default
-"wasabi", the archive), when that target is configured.
+Raw downloads sit in local staging only and are deleted after the run (--keep
+keeps them). They are never uploaded: the publishers serve them for free, so
+only the typed Parquet goes to the lake.
 
 ID columns (anything named like FIPS / GEOID / CODE / ZIP / geocode) are always
 read as text, so leading zeros survive. FCC stations and broadcast contours
@@ -74,16 +75,12 @@ class Publisher:
     def __init__(self, staging: str, dry_run: bool):
         self.staging, self.dry = staging, dry_run
         self.lake = [] if dry_run else lake_targets.load_targets()
-        self.origin = []
-        name = os.getenv("ORIGIN_TARGET", "wasabi")
-        if not dry_run and os.getenv(f"LAKE_{name.upper()}_BUCKET"):
-            self.origin = lake_targets.load_targets(name)
         self.con = duckdb.connect()
 
-    def fetch(self, url: str, origin_key: str) -> str | None:
-        local = os.path.join(self.staging, "raw", origin_key.replace("/", os.sep))
+    def fetch(self, url: str, raw_key: str) -> str | None:
+        local = os.path.join(self.staging, "raw", raw_key.replace("/", os.sep))
         if self.dry:
-            log.info("would fetch %s -> origin/%s", url, origin_key)
+            log.info("would fetch %s", url)
             return None
         if not os.path.exists(local):
             os.makedirs(os.path.dirname(local), exist_ok=True)
@@ -106,8 +103,6 @@ class Publisher:
                         raise
                     log.warning("retry %s (%s)", url, e)
                     time.sleep(10 * (attempt + 1))
-        if self.origin:
-            lake_targets.publish(local, f"origin/reference/{origin_key}", self.origin)
         return local
 
     def to_lake(self, text_path: str, key: str) -> None:

@@ -2,7 +2,8 @@
 
 Benchmarks for the GeoAgent LLM layer: questions a media, market or analytics
 user actually asks ("population of this ZIP", "which ZIPs are in this city",
-"how many people live inside this shape", "how rural is this area"), graded
+"how many people live inside this shape", "how rural is this area", "which
+radio stations cover this ZIP"), graded
 against gold SQL run **live on the lake**. Gold answers are never hardcoded, so
 reloading a vintage re-grades automatically.
 
@@ -17,7 +18,7 @@ evals/
 
 ```bash
 pip install "duckdb>=1.4,<2" boto3 anthropic requests
-set -a; . ../../warehouse/.env; set +a        # LAKE_TARGETS + LAKE_<NAME>_* (primary is read)
+set -a; . ../../warehouse/.env; set +a        # LAKE_AWS_* (see warehouse/.env.example)
 
 python runner.py --agent gold                  # 1. dataset + lake sanity: every gold query runs
 python runner.py --agent claude --effort low   # 2. baseline: Claude + run_sql over the lake
@@ -25,9 +26,9 @@ python runner.py --agent http                  # 3. GeoAgent.app itself (contrac
 ```
 
 A question whose `requires` paths are missing from the lake is **skipped**, not
-failed. ZCTA, RUCA and Gazetteer questions light up once
-`load_tiger_boundaries.py --layers zcta` and `scripts/get_reference_data.py`
-have run.
+failed. That way a partially built lake still gets a meaningful score. The
+scripts that build each path are listed in
+[`../../warehouse/README.md`](../../warehouse/README.md#building-the-lake).
 
 ## Agents
 
@@ -57,7 +58,7 @@ POST $GEOAGENT_EVAL_URL            Authorization: Bearer $GEOAGENT_EVAL_TOKEN
 |---|---|
 | `scalar` | relative error ≤ `tolerance` (0 means exact) |
 | `set` | F1 of the GEOID sets ≥ `min_f1` (default 1.0). Numeric IDs are zero-padded to the gold width, so `8031` matches `08031`. |
-| `abstain` | the agent declines. These questions target data the lake doesn't hold (media outlets, FCC contours), so a confident answer is a hallucination. |
+| `abstain` | the agent declines. These questions target data the lake doesn't hold (newspapers and other media outlets, ownership groups), so a confident answer is a hallucination. |
 
 Each result row logs the gold and agent answers, every SQL call with a result
 preview, the SQL error count, latency, token usage and cost. The summary prints

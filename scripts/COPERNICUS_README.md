@@ -1,5 +1,12 @@
 # Copernicus Sentinel Satellite Data ETL
 
+> **Status: not part of the lake yet.** These fetchers predate the curated
+> lake. They upload every raw download to `S3_BUCKET_NAME`, but the lake
+> stores only curated, transformed data. Don't point them at the lake bucket.
+> They need porting first, to transform locally and publish only the result
+> through `warehouse/lake_targets.py`, like the `*_to_lake.py` scripts. The
+> S3 settings below describe how they work today.
+
 This directory contains scripts for downloading and processing Copernicus Sentinel satellite data from the Copernicus Data Space Ecosystem.
 
 ## Setup

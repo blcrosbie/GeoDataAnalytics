@@ -2,20 +2,22 @@
 
 **Status (2026-11-13): there is no database server any more.** The Hetzner
 node and its PostgreSQL 17 + PostGIS + pg_duckdb service were shut down to cut
-cost. The GeoParquet lake on **AWS S3** (us-east-2, primary, read by GeoAgent)
-is the system of record, with a byte-identical archive copy on **Wasabi**
-(us-central-1, which also keeps the raw `origin/` files). Everything is built
-from source files straight into the lake and queried in place with DuckDB.
+cost. The GeoParquet lake on **AWS S3** (us-east-2, read by GeoAgent) is the
+system of record and the only copy; the Wasabi mirror and its raw `origin/`
+archive were dropped on 2026-11-19. Scripts download each source from its
+publisher into local staging, clean and transform it there, and upload only
+the curated result. Raw files are never uploaded, since they are free to
+fetch again. Everything is queried in place with DuckDB.
 
 ```
- census.gov / USDA / LEHD ──► Wasabi origin/ (raw zips, archive)
+ census.gov / USDA / LEHD / FCC ──► local staging (raw files, deleted after)
                                    │
    scripts/tiger_to_lake.py ───────┤  DuckDB spatial + h3, no database
    scripts/get_reference_data.py ──┤
    load/load_acs_summary_file.py ──┘  (lake step)
                                    ▼
-             AWS S3 curated/  ◄── lake_targets sync ──►  Wasabi curated/
-                  │
+                          AWS S3 curated/
+                                   │
    DuckDB (notebooks, scripts, LLM agent) · GeoAgent PMTiles build · Sedona
 ```
 
@@ -23,9 +25,8 @@ from source files straight into the lake and queried in place with DuckDB.
 
 | Path | What |
 |---|---|
-| `lake_targets.py` | Lake targets (AWS S3, Wasabi) from env: upload with sha256, list, download, `sync`, DuckDB secrets. Every writer goes through it. |
+| `lake_targets.py` | The lake target (AWS S3) from env: upload with sha256, list, DuckDB secrets. Every writer goes through it. |
 | `load/load_acs_summary_file.py` | ACS 5-year table-based Summary File → `curated/acs/` Parquet (the `lake` step). |
-| `export/export_geoparquet.py sync` | Copy whatever the primary has that a mirror lacks (and report parity with `--dry-run`). |
 | `.env.example` | The `LAKE_*` variables every writer reads. |
 
 Boundary partitions are built by [`../scripts/tiger_to_lake.py`](../scripts/tiger_to_lake.py).
@@ -38,7 +39,7 @@ to the retired Postgres service and is kept for reference only. See
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r export/requirements.txt requests
-set -a; . ./.env; set +a          # LAKE_TARGETS, LAKE_AWS_*, LAKE_WASABI_* (see .env.example)
+set -a; . ./.env; set +a          # LAKE_TARGETS=aws, LAKE_AWS_* (see .env.example)
 
 # boundaries: TIGER zips -> curated/boundaries/boundary_type=<T>/year=<Y>/ on every target
 .venv/bin/python ../scripts/tiger_to_lake.py --year 2025 --layers zcta --dry-run   # where the zips come from
@@ -49,23 +50,20 @@ set -a; . ./.env; set +a          # LAKE_TARGETS, LAKE_AWS_*, LAKE_WASABI_* (see
 .venv/bin/python ../scripts/get_reference_data.py gazetteer rel ruca --year 2025
 .venv/bin/python ../scripts/get_reference_data.py lodes --lodes-year 2024 --od
 .venv/bin/python ../scripts/get_reference_data.py lodes --lodes-year 2021 --states mi --od   # MI lags
-.venv/bin/python ../scripts/lodes_rollup_to_lake.py                    # tract/county jobs + county flows
-.venv/bin/python load/load_acs_summary_file.py --year 2024 lake --staging /big/disk/tmp   # 2020+ releases
+.venv/bin/python ../scripts/lodes_rollup_to_lake.py                    # jobs by tract/bg/county/place/zcta/cbsa/sld + county flows
+.venv/bin/python load/load_acs_summary_file.py --year 2024 --root /big/disk/acs-sf lake --staging /big/disk/tmp   # 2020+ (downloads 12 GB once)
 .venv/bin/python ../scripts/acs_api_to_lake.py --years 2014-2019                         # older releases (CENSUS_API_KEY)
 
 # derived layers and media
 .venv/bin/python ../scripts/urbanicity_to_lake.py                      # urban/suburban/exurban/rural
 .venv/bin/python ../scripts/fcc_to_lake.py all --services core         # stations, contours, coverage (~2.5 h)
-
-# keep the two copies identical
-.venv/bin/python export/export_geoparquet.py sync --dry-run
-.venv/bin/python export/export_geoparquet.py sync
 ```
 
-`tiger_to_lake.py` reads the raw zips from the Wasabi `origin/census/<Y>/`
-archive, falling back to census.gov (add `--archive-raw` to keep a copy in
-`origin/`). It skips partitions already on every target unless `--force`
-is passed. Each partition is checked before it is published: no duplicate
+`tiger_to_lake.py` downloads the raw zips from census.gov (or reads them
+from a local `--root` tree) and deletes them once their partition is
+published. It skips partitions already in the lake unless `--force` is
+passed. `load_acs_summary_file.py` downloads the 12 GB Summary File zip from
+census.gov into `--root` once and keeps it there for reruns. Each partition is checked before it is published: no duplicate
 GEOIDs, and the row count must match the source feature count. Vintage-suffixed
 layers (`zcta520`, `uac20`, `puma20`, `cd119`) take the highest suffix, carry
 it in `boundary_type` (`ZCTA520`, `UAC20`), and read `GEOID20`/`NAME20` as
@@ -85,7 +83,8 @@ attributes/boundary_type=<...>/year=<YYYY>/part-0.parquet                       
 acs/vintage=<YYYY>/table=<b19013|...>/part-0.parquet                             ACS 5-year, one wide file per table
 reference/gazetteer|rel2020|ruca|lodes/...                                       see ../scripts/get_reference_data.py
 derived/urbanicity/vintage=<YYYY>/level=<tract|county|cbsa|zcta|place>/          class + population mix
-derived/lodes/year=<YYYY>/level=<tract|county|county_flow>/                      jobs, resident workers, commute flows
+derived/lodes/year=<YYYY>/level=<tract|bg|county|place|zcta|cbsa|sldu|sldl>/     jobs, resident workers
+derived/lodes/year=<YYYY>/level=county_flow/                                     county-to-county commute flows
 media/fcc/stations/snapshot=<DATE>/                                              every US FM/TV/AM record, licensee
 media/fcc/contours/snapshot=<DATE>/band=<fm|tv|am>/                              service contour polygons (GeoParquet)
 media/fcc/coverage/snapshot=<DATE>/level=<station|county|cbsa|zcta|tract>/       population covered per station
@@ -120,8 +119,9 @@ Rows are sorted by `h3_r5`, so Parquet row-group statistics prune on them.
 **Filter on these first and touch geometry last.** Spatial predicates are not
 pushed down to S3.
 
-Raw source files (Census/IRS zips, xlsx and csv) stay under `origin/`, and you
-can read them in place too: `SELECT * FROM read_csv('s3://<bucket>/origin/irs/...')`.
+Raw source files are not in the lake. Read them from the publisher
+(DuckDB's `read_csv` takes an `https://www2.census.gov/...` URL) or rerun the
+script that builds the curated table.
 
 ## Reading the lake
 
@@ -130,7 +130,6 @@ Any DuckDB, GeoPandas, Sedona or QGIS client with a read key can use the files:
 ```python
 import duckdb
 con = duckdb.connect(); con.install_extension("spatial"); con.load_extension("spatial")
-# AWS (primary). For the Wasabi archive: KEY_ID/SECRET plus ENDPOINT 's3.us-central-1.wasabisys.com', URL_STYLE 'path'
 con.execute("CREATE SECRET (TYPE s3, PROVIDER credential_chain, REGION 'us-east-2')")
 con.sql("""SELECT name, ST_Area_Spheroid(geometry)/1e6 AS km2
            FROM read_parquet('s3://<bucket>/curated/boundaries/*/*/*.parquet', hive_partitioning=true)
@@ -173,8 +172,8 @@ can, because Wasabi speaks the S3 API and charges no egress.
 | `init-db/06-pg-duckdb.sh` | Enables pg_duckdb and registers the Wasabi secret from env |
 | `init-db/07-lake-views.sh` | `lake.boundaries` / `lake.attributes` views over the curated Parquet |
 | `migrations/` | Non-destructive migrations for an existing DB |
-| `export/export_geoparquet.py` | Postgres → GeoParquet exporter to every lake target (resumable, verifiable, `sync` between buckets) |
-| `lake_targets.py` | Lake targets (AWS S3, Wasabi) from env: upload, list, sync, DuckDB secrets |
+| `export/export_geoparquet.py` | Postgres → GeoParquet exporter to the lake (resumable, verifiable) |
+| `lake_targets.py` | The lake target (AWS S3) from env: upload, list, DuckDB secrets |
 | `load/load_tiger_boundaries.py` | TIGER/Line zips → `geographic_boundaries`, one vintage, layer by layer |
 | `load/load_acs_summary_file.py` | ACS 5-year table-based Summary File → lake Parquet (all tables) and `geographic_data` (core tables) |
 | `load/build_crosswalk.sql` | Shape-overlap crosswalk between two boundary vintages |

@@ -1,5 +1,5 @@
-# Lab copy of the central warehouse (same image + schema as ../../warehouse).
-# For the shared Hetzner instance use warehouse/docker-compose.yml instead.
+# Local copy of the retired central warehouse (same image + schema as ../../warehouse).
+# The LAKE_S3_* defaults below point at the old Wasabi bucket, which no longer exists.
 services:
   postgres:
     build:
